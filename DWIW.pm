@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.95 2003/01/30 17:48:37 jzawodn Exp $
+## $Id: DWIW.pm,v 1.100 2003/03/20 01:59:21 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.29';
+$VERSION = '0.30';
 $SAFE    = 1;
 
 =head1 NAME
@@ -976,10 +976,10 @@ sub _Execute()
                  $err =~ m/server has gone away/
                  or
                  $err =~ m/Server shutdown in progress/
-                 or
-                 $err =~ m/Deadlock\ found\ when\ trying\ to\ get\ lock;\ Try
-                           \ restarting\ transaction
-                          /x
+                 #or
+                 #$err =~ m/Deadlock\ found\ when\ trying\ to\ get\ lock;\ Try
+                 #          \ restarting\ transaction
+                 #         /x
                 )
                 and
                 $self->RetryWait($err))
@@ -1843,19 +1843,19 @@ sub _OperationSuccessful($)
 {
     my $self = shift;
 
-    if ($self->{RetryCount} and $self->{RetryCount} > 1)
+    if (not $self->{QUIET} and $self->{RetryCount} and $self->{RetryCount} > 1)
     {
         my $now   = localtime;
         my $since = localtime($self->{RetryStart});
-
-        $0 = $self->{RetryCommand} if $self->{RetryCommand};
-
-        warn "$now: $self->{DESC} is back up (down sice $since)\n" unless $self->{QUIET};
+        warn "$now: $self->{DESC} is back up (down sice $since)\n";
     }
 
+    if ($self->{RetryCommand}) {
+        $0 = $self->{RetryCommand};
+        undef $self->{RetryCommand};
+    }
     $self->{RetryCount}  = 0;
-    $self->{RetryStart}  = undef;
-    $self->{RetryCommand}= undef;
+    undef $self->{RetryStart};
 }
 
 ##
@@ -2072,13 +2072,13 @@ sub Begin
         {
             print "$self->{BeginCount}\n" if $self->{VERBOSE};
             $self->{BeginCount}++;
-            return 0;
         }
         else
         {
             print "$self->{TrxName}\n" if $self->{VERBOSE};
-            return 0;
         }
+
+        return 0;
     }
 
     print "Begin() starting new transaction - " if $self->{VERBOSE};
@@ -2095,8 +2095,11 @@ sub Begin
         print "(auto-count)\n" if $self->{VERBOSE};
     }
 
-    ## tell DBI to disable AutoCommit and begin the transaction
-    $self->{DBH}->{AutoCommit} = 0;
+    ## tell DBI to disable AutoCommit and begin the transaction.  wrap it in
+    ## an eval block to try and prevent the occasional error:
+    ## 'DBD driver has not implemented the AutoCommit attribute'
+    eval { $self->{DBH}->{AutoCommit} = 0; };
+
     my $rc = $self->{DBH}->begin_work;
     $self->{TrxRunning} = 1;
     return $rc;
@@ -2139,7 +2142,7 @@ sub Commit
         ## need to commit
         if ($self->{BeginCount} == 0)
         {
-            print "Commit()ing auto-coutning transaction\n" if $self->{VERBOSE};
+            print "Commit()ing auto-counting transaction\n" if $self->{VERBOSE};
             my $rc = $self->{DBH}->commit;
             $self->{DBH}->{AutoCommit} = 1;
             $self->{TrxRunning} = 0;

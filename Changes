@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.30  Wed Mar 19, 2003
+
+    - revert the deadlock changes in 0.29 since it can cause
+      unexpected behavior
+
 0.29  Thu Jan 30, 2003
 
     - fix bug that cause cached connections not to be removed properly
