@@ -1,14 +1,18 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.36 2001/12/17 01:56:31 rayg Exp $
+## $Id: DWIW.pm,v 1.65 2002/03/07 02:07:33 jzawodn Exp $
 
 package DBIx::DWIW;
 
 use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
+use DBI;
+use Carp;
+use Sys::Hostname;  ## for reporting errors
+use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.14';
+$VERSION = '0.18';
 $SAFE    = 1;
 
 =head1 NAME
@@ -102,16 +106,25 @@ The methods follow the Perl tradition of returning false values when
 an error cocurs (an usually setting $@ with a descriptive error
 message).
 
-Any method which takes an SQL query string can also be passed bind values
-for any placeholders in the query string.
+Any method which takes an SQL query string can also be passed bind
+values for any placeholders in the query string:
+
+  C<$db->Hashes("SELECT * FROM foo WHERE id = ?", $id);
+
+Any method which takes an SQL query string can also be passed a
+prepared DWIW statement handle:
+
+  C<$db->Hashes($sth, $id);
+
+Any method which takes an SQL query string will internally call DBI's
+prepare_cached. This ensures that a memory leak does not occur from
+repeatedly preparing the same SQL string. Note that calling a method
+which accepts an SQL query string while another method using the same SQL
+query string is active will cause the first statement to be reset.
 
 =over
 
 =cut
-
-use DBI;
-use Carp;
-use Sys::Hostname;
 
 ##
 ## This is the cache of currently-open connections, filled with
@@ -176,7 +189,7 @@ sub import
         }
         else
         {
-            warn "unknown use arguement: $arg";
+            warn "unknown use argument: $arg";
         }
     }
 }
@@ -220,6 +233,33 @@ The path to the Unix socket to use.
 
 The port number to connect to.
 
+=item Proxy
+
+Set to true to connect to a DBI::ProxyServer proxy.  You'll also need
+to set ProxyHost, ProxyKey, and ProxyPort.  You may also want to set
+ProxyKey and ProxyCypher.
+
+=item ProxyHost
+
+The hostname name of the proxy server.
+
+=item ProxyPort
+
+The port number on which the proxy is listening.  This is probably
+different than the port number on which the database server is
+listening.
+
+=item ProxyKey
+
+If the proxy server you're using requires encryption, supply the
+encryption key (as a hex string).
+
+=item ProxyCipher
+
+If the proxy server requires encryption, supply the name of the
+package which provies encryption.  Typically this will be something
+like C<Crypt::DES> or C<Crypt::Blowfish>.
+
 =item Unique
 
 A boolean which controls connection reuse.
@@ -261,6 +301,16 @@ can't be connected to, C<Connect()> normally prints an error message
 and dies. If C<NoAbort> is true, it will put the error string into
 C<$@> and return false.
 
+=item Timeout
+
+The amount of time (in seconds) after which C<Connect()> will give up
+and return.  You may use fractional seconds, such as 0.5, 1.0, 6.9, or
+whatever.  A Timeout of zero is the same as not having one at all.
+
+If you set the timeout, you probably also want to set C<NoRetry> to a
+true value.  Otherwise you'll be surprised when a server is down and
+your retry logic is running.
+
 =back
 
 There are a minimum of four components to any database connection: DB,
@@ -286,6 +336,8 @@ for more information about what is and isn't preconfigured.
 sub Connect($@)
 {
     my $class = shift;
+    my $use_slave_hack = 0;
+    my $config_name;
 
     ##
     ## If the user asks for a slave connection like this:
@@ -296,18 +348,24 @@ sub Connect($@)
     ##
     if (@_ == 2 and ($_[0] eq 'Slave' or $_[0] eq 'ReadOnly'))
     {
-        if ($class->can('FindSlave'))
-        {
-            @_ = $class->FindSlave($_[1]);
-        }
+        $use_slave_hack = 1;
+        shift;
     }
 
+    my %Options;
+
     ##
-    ## Handle $self->Connect('SomeConfig')
+    ## Handle $self->Connect('SomeConfig') or any odd number
     ##
-    if (@_ == 1 and $class->LocalConfig($_[0]))
+    if (@_ % 2 and $class->LocalConfig($_[0]))
     {
-        @_ = %{$class->LocalConfig($_[0])};
+        my $arg = shift;
+        $config_name = $arg;
+        %Options = (%{$class->LocalConfig($arg)}, @_);
+    }
+    else
+    {
+        %Options = @_;
     }
 
     ##
@@ -315,10 +373,29 @@ sub Connect($@)
     ##
     if (@_ % 2)
     {
-        die "bad number of arguments to Connect";
+        die "bad number of arguments to Connect -- " . join " ", @_;
     }
 
-    my %Options = @_;
+    my $UseSlave = delete($Options{UseSlave});
+
+    if ($use_slave_hack)
+    {
+        $UseSlave = 1;
+    }
+
+    ## Find a slave to use, if we can.
+
+    if ($UseSlave)
+    {
+        if ($class->can('FindSlave'))
+        {
+            %Options = $class->FindSlave(%Options);
+        }
+        else
+        {
+            warn "$class doesn't know how to find slaves";
+        }
+    }
 
     ##
     ## Fetch the arguments.
@@ -326,7 +403,7 @@ sub Connect($@)
     ##
     my $DB       =  delete($Options{DB})   || $class->DefaultDB();
     my $User     =  delete($Options{User}) || $class->DefaultUser($DB);
-    my $Password =  delete($Options{Pass}) || $class->DefaultPass($DB, $User);
+    my $Password =  delete($Options{Pass}) || $class->DefaultPass($DB);
     my $Port     =  delete($Options{Port}) || $class->DefaultPort($DB);
     my $Unique   =  delete($Options{Unique});
     my $Retry    = !delete($Options{NoRetry});
@@ -335,6 +412,14 @@ sub Connect($@)
     my $Verbose  =  delete($Options{Verbose}); # undef = no change
                                                # true  = on
                                                # false = off
+    ## allow empty passwords
+    $Password = $class->DefaultPass($DB, $User) if not defined $Password;
+
+
+    $config_name = $DB unless defined $config_name;
+
+    ## respect the DB_DOWN hack
+    $Quiet = 1 if $ENV{DB_DOWN};
 
     ##
     ## Host parameter is special -- we want to recognize
@@ -393,19 +478,53 @@ sub Connect($@)
         $desc = "local connection to MySQL server on $myhost";
     }
 
-    ## build connection string
-
+    ## we're gonna build the dsn up incrementally...
     my $dsn;
 
-    if ($Port)
+    ## proxy details
+    ##
+    ## This can be factored together once I'm sure it is working.
+
+    # DBI:Proxy:cipher=Crypt::DES;key=$key;hostname=$proxy_host;port=8192;dsn=DBI:mysql:$db:$host
+
+    if ($Options{Proxy})
     {
-        $dsn = "DBI:mysql:$DB:$Host;port=$Port;mysql_client_found_rows=1";
+        if (not ($Options{ProxyHost} and $Options{ProxyPort}))
+        {
+            $@ = "ProxyHost and ProxyPort are required when Proxy is set";
+            die $@ unless $NoAbort;
+            return ();
+        }
+
+        $dsn = "DBI:Proxy";
+
+        my $proxy_port = $Options{ProxyPort};
+        my $proxy_host = $Options{ProxyHost};
+
+        if ($Options{ProxyCipher} and $Options{ProxyKey})
+        {
+            my $proxy_cipher = $Options{ProxyCipher};
+            my $proxy_key    = $Options{ProxyKey};
+
+            $dsn .= ":cipher=$proxy_cipher;key=$proxy_key";
+        }
+
+        $dsn .= ";hostname=$proxy_host;port=$proxy_port";
+        $dsn .= ";dsn=DBI:mysql:$DB:$Host;mysql_client_found_rows=1";
     }
     else
     {
-        $dsn = "DBI:mysql:$DB:$Host;mysql_client_found_rows=1";
+        if ($Port)
+        {
+            $dsn .= "DBI:mysql:$DB:$Host;port=$Port;mysql_client_found_rows=1";
+        }
+        else
+        {
+            $dsn .= "DBI:mysql:$DB:$Host;mysql_client_found_rows=1";
+        }
     }
 
+    print "DSN: $dsn\n" if $ENV{DEBUG};
 
     ##
     ## If we're not looking for a unique connection, and we already have
@@ -424,60 +543,135 @@ sub Connect($@)
         }
     }
 
-    my $db = {
-              DB         => $DB,
-              DBH        => undef,
-              DESC       => $desc,
-              HOST       => $Host,
-              PASS       => $Password,
-              QUIET      => $Quiet,
-              RETRY      => $Retry,
-              UNIQUE     => $Unique,
-              USER       => $User,
-              PORT       => $Port,
-              VERBOSE    => $Verbose,
-              SAFE       => $SAFE,
-              DSN        => $dsn,
-              RetryCount => 0,
-             };
+    my $self = {
+                DB         => $DB,
+                DBH        => undef,
+                DESC       => $desc,
+                HOST       => $Host,
+                PASS       => $Password,
+                QUIET      => $Quiet,
+                RETRY      => $Retry,
+                UNIQUE     => $Unique,
+                USER       => $User,
+                PORT       => $Port,
+                VERBOSE    => $Verbose,
+                SAFE       => $SAFE,
+                DSN        => $dsn,
+                TIMEOUT    => 0,
+                RetryCount => 0,
+               };
 
-    $db = bless $db, $class;
+    $self = bless $self, $class;
 
-  RETRY:
-    my $dbh = DBI->connect($dsn, $User, $Password, { PrintError => 0 });
-
-    if (not ref $dbh)
+    if ($ENV{DBIxDWIW_VERBOSE})
     {
-        if ($Retry
-            and
-            $DBI::errstr =~ m/can\'t connect/i
-            and
-            $db->RetryWait($DBI::errstr))
+        $self->{VERBOSE} = 1;
+    }
+
+    my $dbh;
+    my $done = 0;
+
+    while (not $done)
+    {
+        local($SIG{PIPE}) = 'IGNORE';
+
+        ## If the user wants a timeout, we need to set that up and do
+        ## it here.  This looks complex, but it's really a no-op
+        ## unless the user wants it.
+        ##
+        ## Notice that if a timeout is hit, then the RetryWait() stuff
+        ## will never have a chance to run.  That's good, but we need
+        ## to make sure that users will expect that.
+
+        if ($self->{TIMEOUT})
         {
-            goto RETRY;
+            eval
+            {
+                local $SIG{ALRM} = sub { die "alarm\n" };
+
+                Time::HiRes::alarm($self->{TIMEOUT});
+                $dbh = DBI->connect($dsn, $User, $Password, { PrintError => 0 });
+                Time::HiRes::alarm(0);
+            };
+            if ($@ eq "alarm\n")
+            {
+                $@ = "connection timeout ($self->{TIMEOUT} sec passed)";
+                return undef;
+            }
+        }
+        else
+        {
+            $dbh = DBI->connect($dsn, $User, $Password, { PrintError => 0 });
         }
 
-        warn "$DBI::errstr" if not $Quiet;
-        $@ = "can't connect to database: $DBI::errstr";
-        die $@ unless $NoAbort;
-        $db->_OperationFailed();
-        return ();
-    }
+        if (not ref $dbh)
+        {
+            if ($Retry
+                and
+                ($DBI::errstr =~ m/can\'t connect/i
+                 or
+                 $DBI::errstr =~ m/Too many connections/i)
+                and
+                $self->RetryWait($DBI::errstr))
+            {
+                $done = 0; ## Heh.
+            }
+            else
+            {
+                warn "$DBI::errstr" if not $Quiet;
+                $@ = "can't connect to database: $DBI::errstr";
+                die $@ unless $NoAbort;
+                $self->_OperationFailed();
+                return ();
+            }
+        }
+        else
+        {
+            $done = 1;  ## it worked!
+        }
+    } ## end while not done
 
     ##
     ## We got through....
     ##
-    $db->_OperationSuccessful();
-    $db->{DBH} = $dbh;
+    $self->_OperationSuccessful();
+    $self->{DBH} = $dbh;
 
     ##
     ## Save this one if it's not to be unique.
     ##
-    $CurrentConnections{$dsn} = $db if not $Unique;
-    return $db;
+    $CurrentConnections{$dsn} = $self if not $Unique;
+    return $self;
 }
 
 *new = \&Connect;
+
+=item Timeout()
+
+Like the Timeout argument to Connect(), the amount of time (in
+seconds) after which queries will give up and return.  You may use
+fractional seconds, such as 0.5, 1.0, 6.9, or whatever.  A Timeout of
+zero is the same as not having one at all.
+
+C<Timeout()> called with any (or no) arguments will return the current
+timeout value.
+
+=cut
+
+sub Timeout(;$)
+{
+    my $self = shift;
+    my $time = shift;
+
+    if (defined $time)
+    {
+        $self->{TIMEOUT} = $time;
+    }
+
+    print "TIMEOUT SET TO: $self->{TIMEOUT}\n" if $self->{VERBOSE};
+
+    return $self->{TIMEOUT};
+}
 
 =item Disconnect()
 
@@ -603,35 +797,70 @@ sub _Execute()
     ##
     ## Execute the statement. Retry if requested.
     ##
-  RETRY:
-    local($SIG{PIPE}) = 'IGNORE';
+    my $done = 0;
 
-    $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
-
-    if (not defined $self->{ExecuteReturnCode})
+    while (not $done)
     {
-        ## Check to see if the error is one we should retry for
-        my $err = $self->{DBH}->errstr;
-        if ($self->{RETRY}
-            and
-            ($err =~ m/Lost connection/
-             or
-             $err =~ m/server has gone away/
-             or
-             $err =~ m/Server shutdown in progress/
-            )
-            and
-            $self->RetryWait($err))
+        local($SIG{PIPE}) = 'IGNORE';
+
+        ## If the user wants a timeout, we need to set that up and do
+        ## it here.  This looks complex, but it's really a no-op
+        ## unless the user wants it.
+        ##
+        ## Notice that if a timeout is hit, then the RetryWait() stuff
+        ## will never have a chance to run.  That's good, but we need
+        ## to make sure that users will expect that.
+
+        if ($self->{TIMEOUT})
         {
-            goto RETRY;
+            eval
+            {
+                local $SIG{ALRM} = sub { die "alarm\n" };
+
+                Time::HiRes::alarm($self->{TIMEOUT});
+                $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
+                Time::HiRes::alarm(0);
+            };
+            if ($@ eq "alarm\n")
+            {
+                $@ = "query timeout ($self->{TIMEOUT} sec passed)";
+                return undef;
+            }
+        }
+        else
+        {
+            $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
         }
 
-        ## Really an error -- spit it out if needed.
-        $@ = "$err [in prepared statement]";
-        Carp::cluck "execute of prepared statement returned undef [$err]" if $self->{VERBOSE};
-        $self->_OperationFailed();
-        return undef;
-    };
+        if (not defined $self->{ExecuteReturnCode})
+        {
+            ## Check to see if the error is one we should retry for
+            my $err = $self->{DBH}->errstr;
+            if ($self->{RETRY}
+                and
+                ($err =~ m/Lost connection/
+                 or
+                 $err =~ m/server has gone away/
+                 or
+                 $err =~ m/Server shutdown in progress/
+                )
+                and
+                $self->RetryWait($err))
+            {
+                goto RETRY;
+            }
+
+            ## Really an error -- spit it out if needed.
+            $@ = "$err [in prepared statement]";
+            Carp::cluck "execute of prepared statement returned undef [$err]" if $self->{VERBOSE};
+            $self->_OperationFailed();
+            return undef;
+        }
+        else
+        {
+            $done = 1;
+        }
+    }
 
     ##
     ## Got through.
@@ -675,9 +904,17 @@ sub Execute($$@)
         Carp::croak "not connected to the database" unless $self->{QUIET};
     }
 
-    print "EXECUTE> $sql\n" if $self->{VERBOSE};
+    my $sth;
 
-    my $sth = $self->Prepare($sql);
+    if (ref $sql)
+    {
+        $sth = $sql;
+    }
+    else
+    {
+        print "EXECUTE> $sql\n" if $self->{VERBOSE};
+        $sth = $self->Prepare($sql);
+    }
 
     return $sth->Execute(@bind_vals);
 }
@@ -726,6 +963,14 @@ sub Prepare($$;$)
     }
 
     my $dbi_sth = $self->{DBH}->prepare($sql);
+
+#      my $dbi_sth;
+#      if ($ENV{DWIW_NO_STH_CACHING}) {
+#        $dbi_sth = $self->{DBH}->prepare($sql);
+#      }
+#      else {
+#        $dbi_sth = $self->{DBH}->prepare_cached($sql, {}, 1);
+#      }
 
     ## Build the new statment handle object and bless it into
     ## DBIx::DWIW::Statment.  Then return that object.
@@ -791,6 +1036,8 @@ sub InsertedId($)
         return ();
     }
 }
+
+## Aliases for people who like Id or ID and Last or not Last. :-)
 
 *InsertID     = \&InsertedId;
 *LastInsertID = \&InsertedId;
@@ -1145,6 +1392,113 @@ sub FlatArray($$@)
 
 =pod
 
+=item Scalar($sql)
+
+A generic query routine. Pass an SQL string, and a scalar will be
+returned to you.
+
+If the query matches a single row column pair this is what you want.
+C<Scalar()> is useful for computational queries, count(*), max(xxx),
+etc.
+
+my $max = $dbh->Scalar('select max(id) from personnel');
+
+If the result set would have been an array, scalar return the first
+item on the first row and print a warning.
+
+=cut
+
+sub Scalar()
+{
+    my $self = shift;
+    my $sql  = shift;
+    my $ret;
+
+    $@ = "";
+
+    if (not $self->{DBH})
+    {
+        $@ = "not connected in Scalar()";
+        return ();
+    }
+
+    print STDERR "SCALAR: $sql\n" if $self->{VERBOSE};
+
+    if ($self->Execute($sql))
+    {
+        my $sth = $self->{RecentExecutedSth};
+
+        if ($sth->rows() > 1 or $sth->{NUM_OF_FIELDS} > 1)
+        {
+	  warn "$sql in DWIW::Scalar returned more than 1 row and/or column";
+        }
+	my $ref = $sth->fetchrow_arrayref;
+	$ret = ${$ref}[0];
+    }
+    return $ret;
+}
+
+=pod
+
+=item CSV($sql)
+
+A generic query routine. Pass an SQL string, and a CSV scalar will be
+returned to you.
+
+my $max = $dbh->CSV('select * from personnel');
+
+The example in the middle of page 50 of DuBois\'s I<MySQL> would
+return a value similar to:
+
+     my $item = '"Tyler","John","1790-03-29"\n
+                 "Buchanan","James","1791-04-23"\n
+                 "Polk","James K","1795-11-02"\n
+                 "Fillmore","Millard","1800-01-07",\n
+                 "Pierce","Franklin","1804-11-23"\n';
+
+=cut
+
+sub CSV()
+{
+    my $self = shift;
+    my $sql  = shift;
+    my $ret;
+
+    $@ = "";
+
+    if (not $self->{DBH})
+    {
+        $@ = "not connected in Scalar()";
+        return ();
+    }
+
+    print STDERR "SCALAR: $sql\n" if $self->{VERBOSE};
+
+    if ($self->Execute($sql))
+    {
+        my $sth = $self->{RecentExecutedSth};
+
+        while (my $ref = $sth->fetchrow_arrayref)
+        {
+            my $col = 0;
+            foreach (@{$ref})
+            {
+	        if (defined($_)) {
+		  $ret .= ($sth->{mysql_type_name}[$col++] =~
+			   /(char|text|binary|blob)/) ?
+			     "\"$_\"," : "$_,";
+		} else {
+		  $ret .= "NULL,";
+		}
+	    }
+	    $ret =~ s/,$/\n/;
+        }
+    }
+    return $ret;
+}
+
+=pod
+
 =item Verbose([boolean])
 
 Returns the value of the verbose flag associated with the connection.
@@ -1301,7 +1655,7 @@ sub _OperationSuccessful($)
 
         $0 = $self->{RetryCommand} if $self->{RetryCommand};
 
-        warn "$now: $self->{DESC} is back up (down sice $since)\n";
+        warn "$now: $self->{DESC} is back up (down sice $since)\n" unless $self->{QUIET};
     }
 
     $self->{RetryCount}  = 0;
@@ -1601,7 +1955,7 @@ in Yahoo! Finance (http://finance.yahoo.com).  The folowing people
 contributed to its development:
 
   Jeffrey Friedl (jfriedl@yahoo.com)
-  Ray Goldberger (rayg@bitbaron.com)
+  rayg (rayg@bitbaron.com)
   Jeremy Zawodny (Jeremy@Zawodny.com)
 
 Please direct comments, questions, etc to Jeremy for the time being.
