@@ -1,26 +1,34 @@
 Revision history for Perl extension DBIx::DWIW.
 
-0.01  Fri Sep 14 13:58:52 2001
-	- original version; created by h2xs 1.21 with options
-		-X -n DBIx::DWIW
+0.14  Fri Dec 14 16:05:00 2001
+	- allow generic sql queries to be passed sql with placeholders and
+		bind values
 
-0.06  Sat Oct 14 22:01:22 2001
-	- first release to CPAN with lots of doc cleanups
+0.13  Tue Nov 27 10:15:00 2001
+	- changed alias setting like *sub2 = *sub1 to *sub2 = \&sub1
 
-0.07  Sun Oct 15 15:11:02 2001
-	- fix documentation bug in MyDBI.pm left over from earlier
-
-0.08  Mon Oct 16 12:25:41 2001
-	- added a $sth->finish() call in DESTROY() for statements.
-
-0.09  Wed Oct 16 11:01:41 2001
-	- move DESTROY() code to Disconnect() where it belongs.
-
-0.10  Wed Oct 16 11:07:41 2001
-	- I was dumb.
+0.12  Wed Oct 24 09:51:57 2001
+	- Add Port connection parameter.
 
 0.11  Tue Oct 23 23:58:52 2001
 	- Improve "not connected" error messages.
 
-0.12  WEd Oct 24 09:51:57 2001
-	- Add Port connection parameter.
+0.10  Wed Oct 16 11:07:41 2001
+	- I was dumb.
+
+0.09  Wed Oct 16 11:01:41 2001
+	- move DESTROY() code to Disconnect() where it belongs.
+
+0.08  Mon Oct 16 12:25:41 2001
+	- added a $sth->finish() call in DESTROY() for statements.
+
+0.07  Sun Oct 15 15:11:02 2001
+	- fix documentation bug in MyDBI.pm left over from earlier
+
+0.06  Sat Oct 14 22:01:22 2001
+	- first release to CPAN with lots of doc cleanups
+
+0.01  Fri Sep 14 13:58:52 2001
+	- original version; created by h2xs 1.21 with options
+		-X -n DBIx::DWIW
+

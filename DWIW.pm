@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.30 2001/10/24 23:25:27 jzawodn Exp $
+## $Id: DWIW.pm,v 1.36 2001/12/17 01:56:31 rayg Exp $
 
 package DBIx::DWIW;
 
@@ -8,7 +8,7 @@ use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
 
-$VERSION = '0.13';
+$VERSION = '0.14';
 $SAFE    = 1;
 
 =head1 NAME
@@ -78,9 +78,9 @@ C<DBIx::Password> module on the CPAN.  It may be sufficient.
 =head2 API Simplicity
 
 Taking a lesson from Python (gasp!), this module promotes one obvious
-way to do most things.  If you want to run a query and get the reults
+way to do most things.  If you want to run a query and get the results
 back as a list of hashrefs, there's one way to do that.  The API may
-sacrifice speed in some cases, but new users can easily lean the
+sacrifice speed in some cases, but new users can easily learn the
 simple and descriptive method calls.  (Nobody is forcing you to use
 it.)
 
@@ -101,6 +101,9 @@ you call it, your code may break someday and it will be B<your> fault.
 The methods follow the Perl tradition of returning false values when
 an error cocurs (an usually setting $@ with a descriptive error
 message).
+
+Any method which takes an SQL query string can also be passed bind values
+for any placeholders in the query string.
 
 =over
 
@@ -474,7 +477,7 @@ sub Connect($@)
     return $db;
 }
 
-*new = *Connect;
+*new = \&Connect;
 
 =item Disconnect()
 
@@ -523,7 +526,7 @@ sub Disconnect($)
 
 sub DESTROY($)
 {
-    my $self = shift; # self
+    my $self = shift;
     $self->Disconnect();
 }
 
@@ -584,7 +587,7 @@ sub _Execute()
 {
     my $self      = shift;
     my $statement = shift;
-    my @values    = @_;
+    my @bind_vals = @_;
 
     if (not ref $statement)
     {
@@ -595,7 +598,7 @@ sub _Execute()
 
     my $sth = $statement->{DBI_STH};
 
-    print "_EXECUTE: $statement->{SQL}: ", join(" | ", @values), "\n" if $self->{VERBOSE};
+    print "_EXECUTE: $statement->{SQL}: ", join(" | ", @bind_vals), "\n" if $self->{VERBOSE};
 
     ##
     ## Execute the statement. Retry if requested.
@@ -603,7 +606,7 @@ sub _Execute()
   RETRY:
     local($SIG{PIPE}) = 'IGNORE';
 
-    $self->{ExecuteReturnCode} = $sth->execute(@values);
+    $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
 
     if (not defined $self->{ExecuteReturnCode})
     {
@@ -660,10 +663,11 @@ C<Do()> is a synonym for C<Execute()>
 
 =cut
 
-sub Execute()
+sub Execute($$@)
 {
-    my $self = shift;
-    my $sql  = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     if (not $self->{DBH})
     {
@@ -675,13 +679,13 @@ sub Execute()
 
     my $sth = $self->Prepare($sql);
 
-    return $sth->Execute();
+    return $sth->Execute(@bind_vals);
 }
 
 ##
 ## Do is a synonynm for Execute.
 ##
-*Do = *Execute;
+*Do = \&Execute;
 
 =item Prepare($sql)
 
@@ -700,7 +704,7 @@ handle. It's a DBIx::DWIW::Statement handle.
 
 sub Prepare($$;$)
 {
-    my $self = shift; #self
+    my $self = shift;
     my $sql  = shift;
 
     if (not $self->{DBH})
@@ -788,9 +792,9 @@ sub InsertedId($)
     }
 }
 
-*InsertID = *InsertedId;
-*LastInsertID = *InsertedId;
-*LastInsertId = *InsertedId;
+*InsertID     = \&InsertedId;
+*LastInsertID = \&InsertedId;
+*LastInsertId = \&InsertedId;
 
 =item RowsAffected()
 
@@ -801,10 +805,9 @@ if there was an error.
 
 =cut
 
-sub RowsAffected()
+sub RowsAffected($)
 {
     my $self = shift;
-
     if ($self->{RecentExecutedSth})
     {
         return $self->{RecentExecutedSth}->rows();
@@ -821,10 +824,9 @@ Returns the sql of the most recently executed statement.
 
 =cut
 
-sub RecentSql
+sub RecentSql($)
 {
     my $self = shift;
-
     if ($self->{RecentExecutedSth})
     {
         return $self->{RecentExecutedSth}->{Statement};
@@ -842,7 +844,7 @@ Returns the sql of the most recently prepared statement.
 
 =cut
 
-sub PreparedSql
+sub PreparedSql($)
 {
     my $self = shift;
     if ($self->{RecentpreparedSth})
@@ -878,10 +880,11 @@ C<Hashes()> for queries that might return multiple records.
 
 =cut
 
-sub Hash()
+sub Hash($$@)
 {
-    my $self  = shift;
-    my $sql   = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     if (not $self->{DBH})
     {
@@ -893,7 +896,7 @@ sub Hash()
 
     my $result = undef;
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
         $result = $sth->fetchrow_hashref;
@@ -936,10 +939,11 @@ false.
 
 =cut
 
-sub Hashes()
+sub Hashes($$@)
 {
-    my $self = shift;
-    my $sql  = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     $@ = "";
 
@@ -953,7 +957,7 @@ sub Hashes()
 
     my @records;
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
 
@@ -983,10 +987,11 @@ records.
 
 =cut
 
-sub Array($$;$@)
+sub Array($$@)
 {
-    my $self = shift;
-    my $sql  = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     $@ = "";
 
@@ -1000,7 +1005,7 @@ sub Array($$;$@)
 
     my @result;
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
         @result = $sth->fetchrow_array;
@@ -1045,10 +1050,11 @@ false.
 
 =cut
 
-sub Arrays()
+sub Arrays($$@)
 {
-    my $self = shift;
-    my $sql  = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     $@ = "";
 
@@ -1062,7 +1068,7 @@ sub Arrays()
 
     my @records;
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
 
@@ -1107,10 +1113,11 @@ But you never know.
 
 =cut
 
-sub FlatArray()
+sub FlatArray($$@)
 {
-    my $self = shift;
-    my $sql  = shift;
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
 
     $@ = "";
 
@@ -1124,7 +1131,7 @@ sub FlatArray()
 
     my @records;
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
 
@@ -1151,12 +1158,12 @@ Returns the current value.
 
 sub Verbose()
 {
-    my $db = shift; # self
-    my $val = $db->{VERBOSE};
+    my $self = shift;
+    my $val = $self->{VERBOSE};
 
     if (@_)
     {
-        $db->{VERBOSE} = shift;
+        $self->{VERBOSE} = shift;
     }
 
     return $val;
@@ -1232,7 +1239,7 @@ Returns the real DBI database handle for the connection.
 
 sub dbh($)
 {
-    my $self = shift; # self
+    my $self = shift;
     return $self->{DBH};
 }
 
@@ -1250,7 +1257,7 @@ will fail.
 
 The default implementation causes your application to emit a message
 to STDOUT (via a C<warn()> call) and then sleep for 30 seconds before
-retrying.  You probably wnat to override this so that it will
+retrying.  You probably want to override this so that it will
 eventually give up.  Otherwise your application may hang forever.  It
 does maintain a count of how many times the retry has been attempted
 in C<$self->{RetryCount}>.
@@ -1357,16 +1364,16 @@ In that setup, you have quit a bit of control over what connection
 parameters are used.  And, since it's Just Perl Code, you can do
 anything you need in there.
 
-The following methods are provided to support this in sub-classes:
-
 =head2 Methods Related to Connection Defaults
 
-=pod
+The following methods are provided to support this in sub-classes:
+
+=over
 
 =item LocalConfig($name)
 
 Passed a configuration name, C<LocalConfig()> should return a list of
-conncetion parameters suitable for passing to C<Connect()>.
+connection parameters suitable for passing to C<Connect()>.
 
 By default, C<LocalConfig()> simply returns undef.
 
@@ -1554,18 +1561,18 @@ sub AUTOLOAD
 
 =item Execute([@values])
 
-Executes the statement.  If values are provided, they'll be substitued
+Executes the statement.  If values are provided, they'll be substituted
 for the appropriate placeholders in the SQL.
 
 =cut
 
 sub Execute(@)
 {
-    my $self = shift;
-    my @vals = @_;
-    my $db   = $self->{PARENT};
+    my $self      = shift;
+    my @bind_vals = @_;
+    my $db        = $self->{PARENT};
 
-    return $db->_Execute($self, @vals);
+    return $db->_Execute($self, @bind_vals);
 }
 
 sub DESTROY
