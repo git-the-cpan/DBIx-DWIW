@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.22  Fri Mar 22 00:10:47 2002
+	- fixed Makefile.PL to depend on Time::HiRes
+
 0.21  Tue Mar 19 16:26:00 2002
 	- extended the Hash() method to act as an iterator in some cases
 

@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.73 2002/03/20 00:27:33 jzawodn Exp $
+## $Id: DWIW.pm,v 1.75 2002/03/22 08:11:21 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.21';
+$VERSION = '0.22';
 $SAFE    = 1;
 
 =head1 NAME
@@ -1979,7 +1979,6 @@ contributed to its development:
   Jeffrey Friedl (jfriedl@yahoo.com)
   rayg (rayg@bitbaron.com)
   John Hagelgans (jhagel@yahoo-inc.com)
-  David Yan (davidyan@yahoo-inc.com)
   Jeremy Zawodny (Jeremy@Zawodny.com)
 
 =head1 CREDITS
@@ -1988,6 +1987,7 @@ The following folks have provded feedback, patches, and other help
 along the way:
 
   Eric E. Bowles (bowles@ambisys.com)
+  David Yan (davidyan@yahoo-inc.com)
 
 Please direct comments, questions, etc to Jeremy for the time being.
 Thanks.

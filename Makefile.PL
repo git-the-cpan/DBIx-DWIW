@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'		=> 'DBIx::DWIW',
     'VERSION_FROM'	=> 'DWIW.pm', # finds $VERSION
-    'PREREQ_PM'		=> { DBI => 1.12 }, # e.g., Module::Name => 1.1
+    'PREREQ_PM'		=> { DBI => 1.12, 'Time::HiRes' => 0.01 },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'DWIW.pm', # retrieve abstract from module
        AUTHOR     => 'Jeremy Zawodny <Jeremy@Zawodny.com>') : ()),
