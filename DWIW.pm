@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.100 2003/03/20 01:59:21 jzawodn Exp $
+## $Id: DWIW.pm,v 1.103 2003/03/21 22:13:30 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.30';
+$VERSION = '0.31';
 $SAFE    = 1;
 
 =head1 NAME
@@ -964,22 +964,19 @@ sub _Execute()
 
         ## Otherwise, if it's an error that we know is "retryable" and
         ## the user wants to retry (based on the RetryWait() call),
-        ## we'll try again.
+        ## we'll try again.  But we will not retry if in the midst of a
+        ## transaction.
 
         if (not defined $self->{ExecuteReturnCode})
         {
             my $err = $self->{DBH}->errstr;
-            if ($self->{RETRY}
+            if ($self->{RETRY} and not $self->{TrxRunning}
                 and
                 ($err =~ m/Lost connection/
                  or
                  $err =~ m/server has gone away/
                  or
                  $err =~ m/Server shutdown in progress/
-                 #or
-                 #$err =~ m/Deadlock\ found\ when\ trying\ to\ get\ lock;\ Try
-                 #          \ restarting\ transaction
-                 #         /x
                 )
                 and
                 $self->RetryWait($err))
@@ -1805,11 +1802,15 @@ when the failure occured will be retried.  If it returns 0, the action
 will fail.
 
 The default implementation causes your application to emit a message
-to STDOUT (via a C<warn()> call) and then sleep for 30 seconds before
+to STDERR (via a C<warn()> call) and then sleep for 30 seconds before
 retrying.  You probably want to override this so that it will
 eventually give up.  Otherwise your application may hang forever.  It
 does maintain a count of how many times the retry has been attempted
 in C<$self->{RetryCount}>.
+
+Note that RetryWait() will not be called in the middle of transaction.
+In that case, we assume that the transaction will have been rolled
+back by the server and you'll get an error.
 
 =cut
 

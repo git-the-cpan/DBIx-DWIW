@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.31  Fri Mar 21, 2003
+
+    - don't let RetryWait() get called when a transaction is running
+
 0.30  Wed Mar 19, 2003
 
     - revert the deadlock changes in 0.29 since it can cause
