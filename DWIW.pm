@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.28 2001/10/24 16:52:51 jzawodn Exp $
+## $Id: DWIW.pm,v 1.30 2001/10/24 23:25:27 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -8,7 +8,7 @@ use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
 
-$VERSION = '0.12';
+$VERSION = '0.13';
 $SAFE    = 1;
 
 =head1 NAME
@@ -331,7 +331,7 @@ sub Connect($@)
     my $NoAbort  =  delete($Options{NoAbort});
     my $Verbose  =  delete($Options{Verbose}); # undef = no change
                                                # true  = on
-                                               # true  = off
+                                               # false = off
 
     ##
     ## Host parameter is special -- we want to recognize
@@ -414,7 +414,7 @@ sub Connect($@)
         {
             if (defined $Verbose)
             {
-                $db->{VERBOSE} = 1;
+                $db->{VERBOSE} = $Verbose;
             }
 
             return $db;
@@ -434,6 +434,7 @@ sub Connect($@)
               PORT       => $Port,
               VERBOSE    => $Verbose,
               SAFE       => $SAFE,
+              DSN        => $dsn,
               RetryCount => 0,
              };
 
@@ -490,7 +491,7 @@ sub Disconnect($)
 
     if (not $self->{UNIQUE})
     {
-        delete $CurrentConnections{$self->{HOST},$self->{USER},$self->{PASS},$self->{DB}};
+        delete $CurrentConnections{$self->{DSN}};
     }
 
     if (not $self->{DBH})
