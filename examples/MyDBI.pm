@@ -68,7 +68,7 @@ my %Config =
  {
   @defaults,
   DB   => 'test',
-  User => 'gamer'.
+  User => 'gamer',
   Pass => 'IlikeDOOM',
  },
 

@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.82 2002/06/06 23:08:37 jzawodn Exp $
+## $Id: DWIW.pm,v 1.88 2002/10/28 21:02:30 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.26';
+$VERSION = '0.27';
 $SAFE    = 1;
 
 =head1 NAME
@@ -210,18 +210,12 @@ message).
 Any method which takes an SQL query string can also be passed bind
 values for any placeholders in the query string:
 
-  C<$db->Hashes("SELECT * FROM foo WHERE id = ?", $id);
+  $db->Hashes("SELECT * FROM foo WHERE id = ?", $id);
 
 Any method which takes an SQL query string can also be passed a
 prepared DWIW statement handle:
 
-  C<$db->Hashes($sth, $id);
-
-Any method which takes an SQL query string will internally call DBI's
-prepare_cached. This ensures that a memory leak does not occur from
-repeatedly preparing the same SQL string. Note that calling a method
-which accepts an SQL query string while another method using the same SQL
-query string is active will cause the first statement to be reset.
+  $db->Hashes($sth, $id);
 
 =over
 
@@ -380,6 +374,11 @@ flag when you do, or you'll end up with the same connection and spend
 a lot of time pulling your hair out over why the code does mysterous
 things.
 
+As of version 0.27, DWIW also checks the class name of the caller and
+guarateeus unique connections across different classes.  So if you
+call Connect() from SubClass1 and SubClass2, each class gets its own
+connection.
+
 =item Verbose
 
 Turns verbose reporting on.  See C<Verbose()>.
@@ -504,7 +503,7 @@ sub Connect($@)
     ##
     my $DB       =  delete($Options{DB})   || $class->DefaultDB();
     my $User     =  delete($Options{User}) || $class->DefaultUser($DB);
-    my $Password =  delete($Options{Pass}) || $class->DefaultPass($DB);
+    my $Password =  delete($Options{Pass});
     my $Port     =  delete($Options{Port}) || $class->DefaultPort($DB);
     my $Unique   =  delete($Options{Unique});
     my $Retry    = !delete($Options{NoRetry});
@@ -515,8 +514,7 @@ sub Connect($@)
                                                # true  = on
                                                # false = off
     ## allow empty passwords
-    $Password = $class->DefaultPass($DB, $User) if not defined $Password;
-
+    $Password = $class->DefaultPass($DB) if not defined $Password;
 
     $config_name = $DB unless defined $config_name;
 
@@ -634,7 +632,7 @@ sub Connect($@)
     ##
     if (not $Unique)
     {
-        if (my $db = $CurrentConnections{$dsn})
+        if (my $db = $CurrentConnections{$dsn . $class})
         {
             if (defined $Verbose)
             {
@@ -748,7 +746,7 @@ sub Connect($@)
     ##
     ## Save this one if it's not to be unique.
     ##
-    $CurrentConnections{$dsn} = $self if not $Unique;
+    $CurrentConnections{$dsn . $class} = $self if not $Unique;
     return $self;
 }
 
@@ -1096,14 +1094,6 @@ sub Prepare($$;$)
 
     my $dbi_sth = $self->{DBH}->prepare($sql);
 
-#      my $dbi_sth;
-#      if ($ENV{DWIW_NO_STH_CACHING}) {
-#        $dbi_sth = $self->{DBH}->prepare($sql);
-#      }
-#      else {
-#        $dbi_sth = $self->{DBH}->prepare_cached($sql, {}, 1);
-#      }
-
     ## Build the new statment handle object and bless it into
     ## DBIx::DWIW::Statment.  Then return that object.
 
@@ -1262,14 +1252,15 @@ memory, you may wish to call C<Hash()> once with a valid query and
 call it repetedly with no SQL to retrieve records one at a time.
 It'll take more CPU to do this, but it is more memory efficient:
 
-  $db->Hash("SELECT * FROM big_table");
+  my $record = $db->Hash("SELECT * FROM big_table");
+  do {
+      # ... do something with $record
+  }  while (defined($record = $db->Hash()));
 
-  while (defined $stuff = $db->Hash())
-  {
-      # ... do stuff
-  }
+Note that a call to any other DWIW query will reset the iterator, so only
+do so when you are finished with the current query.
 
-This seems like it breaks the priciple of having only one obvious way
+This seems like it breaks the principle of having only one obvious way
 to do things with this package.  But it's really not all that obvious,
 now is it? :-)
 
@@ -1280,6 +1271,8 @@ sub Hash($$@)
     my $self      = shift;
     my $sql       = shift || "";
     my @bind_vals = @_;
+
+    $@ = "";
 
     if (not $self->{DBH})
     {
@@ -1425,7 +1418,7 @@ sub Array($$@)
 =item Arrays($sql)
 
 A generic query routine. Given an SQL statement, returns a list of
-hashrefs, one per returned record, containing the values of each
+array refs, one per returned record, containing the values of each
 record.
 
 The example in the middle of page 50 of DuBois's I<MySQL> would return
@@ -1551,8 +1544,8 @@ etc.
 
 my $max = $dbh->Scalar('select max(id) from personnel');
 
-If the result set would have been an array, scalar return the first
-item on the first row and print a warning.
+If the result set contains more than one value, the first value is returned
+and a warning is issued.
 
 =cut
 
@@ -1932,17 +1925,17 @@ sub DefaultUser($$)
 
 =item DefaultPass($config_name)
 
-Returns the default password for the given configuration. Calls
-C<LocalConfig()> to get it.
+Returns the default password for the given configuration.
+Calls C<LocalConfig()> to get it.
 
 =cut
 
-sub DefaultPass($$$)
+sub DefaultPass($$)
 {
     my ($class, $DB, $User) = @_;
     if (my $DbConfig = $class->LocalConfig($DB))
     {
-        if ($DbConfig->{Pass})
+        if (defined $DbConfig->{Pass})
         {
             return $DbConfig->{Pass};
         }
@@ -2309,6 +2302,8 @@ along the way:
 
   Eric E. Bowles (bowles@ambisys.com)
   David Yan (davidyan@yahoo-inc.com)
+  DH <crazyinsomniac@yahoo.com>
+  Toby Elliott (telliott@yahoo-inc.com)
 
 Please direct comments, questions, etc to Jeremy for the time being.
 Thanks.
