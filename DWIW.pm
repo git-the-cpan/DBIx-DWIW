@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.113 2004/02/02 08:01:24 jfriedl Exp $
+## $Id: DWIW.pm,v 1.114 2004/02/24 17:00:32 jfriedl Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.35';
+$VERSION = '0.36';
 $SAFE    = 1;
 
 =head1 NAME
@@ -702,7 +702,10 @@ sub Connect($@)
             };
             if ($@ eq "alarm\n")
             {
-                $@ = "connection timeout ($self->{TIMEOUT} sec passed)";
+                my $timeout = $self->{TIMEOUT};
+                undef $self; # this fires the DESTROY, which sets $@, so must
+                             # do before setting $@ below.
+                $@ = "connection timeout ($timeout sec passed)";
                 return ();
             }
         }
@@ -726,9 +729,11 @@ sub Connect($@)
             else
             {
                 warn "$DBI::errstr" if not $Quiet;
-                $@ = "can't connect to database: $DBI::errstr";
+                my $ERROR = $@ = "can't connect to database: $DBI::errstr";
                 die $@ unless $NoAbort;
                 $self->_OperationFailed();
+                undef $self; # This fires the DESTROY, which sets $@.
+                $@ = $ERROR; # Just in case the DESTROY did set $@.
                 return ();
             }
         }
@@ -751,6 +756,7 @@ sub Connect($@)
     {
         $CurrentConnections{$self->{UNIQUE_KEY}} = $self;
     }
+
     return $self;
 }
 

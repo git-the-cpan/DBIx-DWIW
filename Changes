@@ -1,5 +1,12 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.36  Feb 26, 2004
+
+    - Setting $@ in Connect after $self was blessed didn't work, since
+      $self's DESTROY was overwriting $@. So, undef $self before
+      setting $@, and $@ actually remains available to the caller of
+      Connect.
+
 0.35  Feb 04, 2004
 
     - Make code match documentation for the NoRetry option.  It only
