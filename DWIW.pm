@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.75 2002/03/22 08:11:21 jzawodn Exp $
+## $Id: DWIW.pm,v 1.76 2002/03/29 22:29:09 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 $SAFE    = 1;
 
 =head1 NAME
@@ -409,6 +409,7 @@ sub Connect($@)
     my $Retry    = !delete($Options{NoRetry});
     my $Quiet    =  delete($Options{Quiet});
     my $NoAbort  =  delete($Options{NoAbort});
+    my $Timeout  =  delete($Options{Timeout});
     my $Verbose  =  delete($Options{Verbose}); # undef = no change
                                                # true  = on
                                                # false = off
@@ -557,7 +558,7 @@ sub Connect($@)
                 VERBOSE    => $Verbose,
                 SAFE       => $SAFE,
                 DSN        => $dsn,
-                TIMEOUT    => 0,
+                TIMEOUT    => $Timeout,
                 RetryCount => 0,
                };
 
