@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.13 2001/10/14 21:53:14 jzawodn Exp $
+## $Id: DWIW.pm,v 1.23 2001/10/17 18:04:41 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -8,7 +8,7 @@ use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
 
-$VERSION = '0.07';
+$VERSION = '0.10';
 $SAFE    = 1;
 
 =head1 NAME
@@ -467,28 +467,36 @@ error (with the error being returned in C<$@>).
 
 sub Disconnect($)
 {
-    my $db = shift;
+    my $self = shift;
 
-    if (not $db->{UNIQUE})
+    if (not $self->{UNIQUE})
     {
-        delete $CurrentConnections{$db->{HOST},$db->{USER},$db->{PASS},$db->{DB}};
+        delete $CurrentConnections{$self->{HOST},$self->{USER},$self->{PASS},$self->{DB}};
     }
 
-    if (not $db->{DBH})
+    if (not $self->{DBH})
     {
         $@ = "not connected";
         return ();
     }
-    elsif (not $db->{DBH}->disconnect())
+
+    ## clean up a lingering sth if there is one...
+
+    if (defined $self->{RecentExecutedSth})
+    {
+        $self->{RecentExecutedSth}->finish();
+    }
+
+    if (not $self->{DBH}->disconnect())
     {
         $@ = "couldn't disconnect (or wasn't disconnected)";
-        $db->{DBH} = undef;
+        $self->{DBH} = undef;
         return ();
     }
     else
     {
         $@ = "";
-        $db->{DBH} = undef;
+        $self->{DBH} = undef;
         return 1;
     }
 }
@@ -1413,7 +1421,7 @@ sub DefaultPass($$$)
 
 =pod
 
-=item DefaultHost()
+=item DefaultHost($config_name)
 
 Returns the default hostname for the given configuration.  Calls
 C<LocalConfig()> to get it.
@@ -1519,6 +1527,15 @@ sub Execute(@)
 
 sub DESTROY
 {
+#      my $self = shift;
+
+#      return unless defined $self;
+#      return unless ref($self);
+
+#      if ($self->{DBI_STH})
+#      {
+#          $self->{DBI_STH}->finish();
+#      }
 }
 
 1;
