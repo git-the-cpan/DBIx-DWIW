@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.90 2002/11/04 23:55:27 jzawodn Exp $
+## $Id: DWIW.pm,v 1.95 2003/01/30 17:48:37 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.28';
+$VERSION = '0.29';
 $SAFE    = 1;
 
 =head1 NAME
@@ -658,6 +658,7 @@ sub Connect($@)
                 VERBOSE     => $Verbose,
                 SAFE        => $SAFE,
                 DSN         => $dsn,
+                UNIQUE_KEY  => $dsn . $class,
                 TIMEOUT     => $Timeout,
                 RetryCount  => 0,
 
@@ -702,7 +703,7 @@ sub Connect($@)
             if ($@ eq "alarm\n")
             {
                 $@ = "connection timeout ($self->{TIMEOUT} sec passed)";
-                return undef;
+                return ();
             }
         }
         else
@@ -746,7 +747,10 @@ sub Connect($@)
     ##
     ## Save this one if it's not to be unique.
     ##
-    $CurrentConnections{$dsn . $class} = $self if not $Unique;
+    if (not $Unique)
+    {
+        $CurrentConnections{$self->{UNIQUE_KEY}} = $self;
+    }
     return $self;
 }
 
@@ -814,7 +818,7 @@ sub Disconnect($)
 
     if (not $self->{UNIQUE})
     {
-        delete $CurrentConnections{$self->{DSN} . $class};
+        delete $CurrentConnections{$self->{UNIQUE_KEY} . $class};
     }
 
     if (not $self->{DBH})
@@ -950,7 +954,7 @@ sub _Execute()
             if ($@ eq "alarm\n")
             {
                 $@ = "query timeout ($self->{TIMEOUT} sec passed)";
-                return undef;
+                return ();
             }
         }
         else
@@ -972,6 +976,10 @@ sub _Execute()
                  $err =~ m/server has gone away/
                  or
                  $err =~ m/Server shutdown in progress/
+                 or
+                 $err =~ m/Deadlock\ found\ when\ trying\ to\ get\ lock;\ Try
+                           \ restarting\ transaction
+                          /x
                 )
                 and
                 $self->RetryWait($err))
@@ -985,7 +993,7 @@ sub _Execute()
             $@ = "$err [in prepared statement]";
             Carp::cluck "execute of prepared statement returned undef [$err]" if $self->{VERBOSE};
             $self->_OperationFailed();
-            return undef;
+            return ();
         }
         else
         {
@@ -1534,6 +1542,45 @@ sub FlatArray($$@)
 
 =pod
 
+=item FlatArrayRef($sql)
+
+Works just like C<FlatArray()> but reutrns an reft to the array instead
+of copying it.  This is a big win if you have very large arrays.
+
+=cut
+
+sub FlatArrayRef($$@)
+{
+    my $self      = shift;
+    my $sql       = shift;
+    my @bind_vals = @_;
+
+    $@ = "";
+
+    if (not $self->{DBH})
+    {
+        $@ = "not connected in FlatArray()";
+        return ();
+    }
+
+    print "FLATARRAY: $sql\n" if $self->{VERBOSE};
+
+    my @records;
+
+    if ($self->Execute($sql, @bind_vals))
+    {
+        my $sth = $self->{RecentExecutedSth};
+
+        while (my $ref = $sth->fetchrow_arrayref)
+        {
+            push @records, @{$ref};
+        }
+    }
+    return \@records;
+}
+
+=pod
+
 =item Scalar($sql)
 
 A generic query routine. Pass an SQL string, and a scalar will be
@@ -1626,17 +1673,22 @@ sub CSV()
             my $col = 0;
             foreach (@{$ref})
             {
-                if (defined($_)) {
+                if (defined($_))
+                {
                   $ret .= ($sth->{mysql_type_name}[$col++] =~
                            /(char|text|binary|blob)/) ?
                              "\"$_\"," : "$_,";
-                } else {
+                }
+                else
+                {
                   $ret .= "NULL,";
                 }
             }
+
             $ret =~ s/,$/\n/;
         }
     }
+
     return $ret;
 }
 
@@ -1872,13 +1924,13 @@ The following methods are provided to support this in sub-classes:
 Passed a configuration name, C<LocalConfig()> should return a list of
 connection parameters suitable for passing to C<Connect()>.
 
-By default, C<LocalConfig()> simply returns undef.
+By default, C<LocalConfig()> simply returns an empty list.
 
 =cut
 
 sub LocalConfig($$)
 {
-    return undef;
+    return ();
 }
 
 =pod
@@ -1899,7 +1951,7 @@ sub DefaultDB($)
         return $DbConfig->{DB};
     }
 
-    return undef;
+    return ();
 }
 
 =pod
@@ -1919,7 +1971,7 @@ sub DefaultUser($$)
     {
         return $DbConfig->{User};
     }
-    return undef;
+    return ();
 }
 
 =pod
@@ -1941,7 +1993,7 @@ sub DefaultPass($$)
             return $DbConfig->{Pass};
         }
     }
-    return undef;
+    return ();
 }
 
 =pod
@@ -1963,7 +2015,7 @@ sub DefaultHost($$)
                 return $DbConfig->{Host};
         }
     }
-    return undef;
+    return ();
 }
 
 =pod
@@ -1984,7 +2036,7 @@ sub DefaultPort($$)
         {
             if ($DbConfig->{Host} eq hostname)
             {
-                return undef; #use local connection
+                return (); #use local connection
             }
             else
             {
@@ -1992,7 +2044,7 @@ sub DefaultPort($$)
             }
         }
     }
-    return undef;
+    return ();
 }
 
 =pod
@@ -2105,7 +2157,7 @@ sub Commit
             print "Commit() is confused -- BeginCount went negative!\n"
                 if $self->{VERBOSE};
             $@ = "Commit() is confused.  BeginCount went negative!";
-            return undef;
+            return ();
         }
 
     }
@@ -2151,7 +2203,7 @@ sub Commit
     {
         print "Commit() is confused -- something is wonky\n" if $self->{VERBOSE};
         $@ = "Commit() is confused.  Internal state problem.";
-        return undef;
+        return ();
     }
 
 }

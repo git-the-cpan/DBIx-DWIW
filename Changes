@@ -1,29 +1,52 @@
 Revision history for Perl extension DBIx::DWIW.
 
-0.28  Mon Nov  4 16:20:32
-	- fix class checking in Disconnect() too
+0.29  Thu Jan 30, 2003
 
-0.27  Mon Oct 28 13:20:11
-	- put class checkign in Connect().  See the description of
-		Connect() fot details
+    - fix bug that cause cached connections not to be removed properly
+
+    - made sure that list-returning functions always return () rather
+      than undef
+
+    - added FlatArrayRef() for working with very large flat lists
+
+    - invoke the Retry/Wait logic on InnoDB deadlocks.
+
+    - revised format of the Changes file so it's easier to read and
+      edit.  It shoudl be auto-generated, but the check-in messages
+      aren't always clear.
+
+0.28  Mon Nov 4, 2002
+
+    - fix class checking in Disconnect() too
+
+0.27  Mon Oct 28, 2002
+
+    - put class checkign in Connect().  See the description of
+      Connect() fot details
 
 0.26  ???
-	- ???
 
-0.25  Thu Jun  6 16:01:11
-	- version bump for pause.cpan.org problem
+    - ???
 
-0.25  Thu Jun  6 16:01:11
-	- added Begin(), Commit(), and Rollback() for safe transaction
-		handling
-	- cleaned up the output of Dump() so that it doesn't try to
-		dump keys with undef values.
+0.25  Thu Jun 6, 2002
 
-0.24  Mon Apr  8 17:24:47 2002
-	- added Dump() method for debugging what's going on
+    - version bump for pause.cpan.org problem
 
-0.23  Fri Mar 29 00:10:47 2002
-	- implement Timeout option in Connect() as documented
+0.25  Thu Jun 6, 2002
+
+    -  added Begin(), Commit(), and Rollback() for safe transaction
+       handling
+
+    - cleaned up the output of Dump() so that it doesn't try to dump
+      keys with undef values.
+
+0.24  Mon Apr  8, 2002
+
+    - added Dump() method for debugging what's going on
+
+0.23  Fri Mar 29, 2002
+
+    - implement Timeout option in Connect() as documented
 
 0.22  Fri Mar 22 00:10:47 2002
 	- fixed Makefile.PL to depend on Time::HiRes
