@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.12 2001/10/14 05:27:52 jzawodn Exp $
+## $Id: DWIW.pm,v 1.13 2001/10/14 21:53:14 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -8,7 +8,7 @@ use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 $SAFE    = 1;
 
 =head1 NAME

@@ -25,7 +25,7 @@ ODBC DSNs in the Windows world, if that helps you at all). They have
 names like C<Finance>, C<Games>, C<Homer>, etc., with C<Homer> being
 the default. To access another, use something like:
 
-  my $db = Finance::DBI->Connect('Games');
+  my $db = MyDBI->Connect('Games');
 
 Note that if you use the single argument form of C<Connect()>, which
 we highly recommend, you are specifying a B<configuration name>, not

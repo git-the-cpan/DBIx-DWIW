@@ -4,3 +4,8 @@ Revision history for Perl extension DBIx::DWIW.
 	- original version; created by h2xs 1.21 with options
 		-X -n DBIx::DWIW
 
+0.06  Sat Sep 14 22:01:22 2001
+	- first release to CPAN with lots of doc cleanups
+
+0.07  Sun Sep 15 15:11:02 2001
+	- fix documentation bug in MyDBI.pm left over from earlier
