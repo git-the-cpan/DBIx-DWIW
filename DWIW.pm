@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.71 2002/03/15 06:57:16 jzawodn Exp $
+## $Id: DWIW.pm,v 1.73 2002/03/20 00:27:33 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.20';
+$VERSION = '0.21';
 $SAFE    = 1;
 
 =head1 NAME
@@ -1130,12 +1130,28 @@ false.
 Use this routine only if the query will return a single record.  Use
 C<Hashes()> for queries that might return multiple records.
 
+Because calling C<Hashes()> on a larger recordset can use a lot of
+memory, you may wish to call C<Hash()> once with a valid query and
+call it repetedly with no SQL to retrieve records one at a time.
+It'll take more CPU to do this, but it is more memory efficient:
+
+  $db->Hash("SELECT * FROM big_table");
+
+  while (defined $stuff = $db->Hash())
+  {
+      # ... do stuff
+  }
+
+This seems like it breaks the priciple of having only one obvious way
+to do things with this package.  But it's really not all that obvious,
+now is it? :-)
+
 =cut
 
 sub Hash($$@)
 {
     my $self      = shift;
-    my $sql       = shift;
+    my $sql       = shift || "";
     my @bind_vals = @_;
 
     if (not $self->{DBH})
@@ -1148,7 +1164,7 @@ sub Hash($$@)
 
     my $result = undef;
 
-    if ($self->Execute($sql, @bind_vals))
+    if ($sql eq "" or $self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
         $result = $sth->fetchrow_hashref;
@@ -1963,6 +1979,7 @@ contributed to its development:
   Jeffrey Friedl (jfriedl@yahoo.com)
   rayg (rayg@bitbaron.com)
   John Hagelgans (jhagel@yahoo-inc.com)
+  David Yan (davidyan@yahoo-inc.com)
   Jeremy Zawodny (Jeremy@Zawodny.com)
 
 =head1 CREDITS

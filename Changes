@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.21  Tue Mar 19 16:26:00 2002
+	- extended the Hash() method to act as an iterator in some cases
+
 0.20  Fri Mar 15 10:00:00 2002
 	- various updates missing between now and 0.14
 
