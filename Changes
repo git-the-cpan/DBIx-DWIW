@@ -1,6 +1,9 @@
 Revision history for Perl extension DBIx::DWIW.
 
 0.25  Thu Jun  6 16:01:11
+	- version bump for pause.cpan.org problem
+
+0.25  Thu Jun  6 16:01:11
 	- added Begin(), Commit(), and Rollback() for safe transaction
 		handling
 	- cleaned up the output of Dump() so that it doesn't try to

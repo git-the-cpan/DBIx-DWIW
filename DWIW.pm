@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.81 2002/06/06 23:04:45 jzawodn Exp $
+## $Id: DWIW.pm,v 1.82 2002/06/06 23:08:37 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.25';
+$VERSION = '0.26';
 $SAFE    = 1;
 
 =head1 NAME
