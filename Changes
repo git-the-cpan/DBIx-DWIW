@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.28  Mon Nov  4 16:20:32
+	- fix class checking in Disconnect() too
+
 0.27  Mon Oct 28 13:20:11
 	- put class checkign in Connect().  See the description of
 		Connect() fot details

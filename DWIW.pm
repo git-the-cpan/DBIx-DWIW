@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.88 2002/10/28 21:02:30 jzawodn Exp $
+## $Id: DWIW.pm,v 1.90 2002/11/04 23:55:27 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.27';
+$VERSION = '0.28';
 $SAFE    = 1;
 
 =head1 NAME
@@ -223,7 +223,7 @@ prepared DWIW statement handle:
 
 ##
 ## This is the cache of currently-open connections, filled with
-##       $CurrentConnections{host,user,password,db} = $db
+##       $CurrentConnections{host,user,password,db . class} = $db
 ##
 my %CurrentConnections;
 
@@ -810,10 +810,11 @@ error (with the error being returned in C<$@>).
 sub Disconnect($)
 {
     my $self = shift;
+    my $class = ref $self;
 
     if (not $self->{UNIQUE})
     {
-        delete $CurrentConnections{$self->{DSN}};
+        delete $CurrentConnections{$self->{DSN} . $class};
     }
 
     if (not $self->{DBH})
