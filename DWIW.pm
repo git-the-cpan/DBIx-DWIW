@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.65 2002/03/07 02:07:33 jzawodn Exp $
+## $Id: DWIW.pm,v 1.67 2002/03/12 00:44:03 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.18';
+$VERSION = '0.19';
 $SAFE    = 1;
 
 =head1 NAME
@@ -458,13 +458,13 @@ sub Connect($@)
         return ();
     }
 
-    if (%Options)
-    {
-        my $keys = join(', ', keys %Options);
-        $@ = "bad parameters [$keys] to Connect()";
-        die $@ unless $NoAbort;
-        return ();
-    }
+#      if (%Options)
+#      {
+#          my $keys = join(', ', keys %Options);
+#          $@ = "bad parameters [$keys] to Connect()";
+#          die $@ unless $NoAbort;
+#          return ();
+#      }
 
     my $myhost = hostname();
     my $desc;
