@@ -1,5 +1,16 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.40  Sep 08, 2004
+
+    - Various "internal" releases at Yahoo added some experimental
+      connection related stuff.  See ConnectTimeoutOverride,
+      ConnetTimeoutHook, ExecuteTimeoutHook, and PreConnectHook in the
+      code if you're interested.  It will remain undocumented for now.
+
+    - If Disconnect() is called and there's no valid handle, it
+      shouldn't be an error.  A connectionless object may exist and be
+      destroyed, which triggers a Disconnect() call in the destructor.
+
 0.36  Feb 26, 2004
 
     - Setting $@ in Connect after $self was blessed didn't work, since

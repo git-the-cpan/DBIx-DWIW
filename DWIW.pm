@@ -1,19 +1,18 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.114 2004/02/24 17:00:32 jfriedl Exp $
+## $Id: DWIW.pm,v 1.118 2004/09/04 11:37:38 jfriedl Exp $
 
 package DBIx::DWIW;
 
 use 5.005;
 use strict;
-use vars qw[$VERSION $SAFE];
 use DBI;
 use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.36';
-$SAFE    = 1;
+our $VERSION = '0.40';
+our $SAFE    = 1;
 
 =head1 NAME
 
@@ -289,6 +288,48 @@ sub import
     }
 }
 
+##
+## This is an 'our' variable so that it can be easily overridden with
+## 'local', e.g.
+##
+##   {
+##      local($DBIx::DWIW::ConnectTimeoutOverride) = $DBIx::DWIW::ShorterTimeout($ConnectTimeoutOverride, 1.5)
+##      Some::Routine::That::Connects();
+##   }
+##
+## It has the following semantics:
+##    undef   -- unset; no impact
+##      0     -- infinite timeout (no timeout)
+##     > 0    -- timeout, in seconds
+##
+our $ConnectTimeoutOverride;
+our %ConnectTimeoutOverrideByHost; ## on a per-host basis
+
+##
+## Given two timeouts, return the one that's shorter. Note that a false
+## value is the same as an infinite timeout.
+##
+sub ShorterTimeout($$)
+{
+    my $a = shift;
+    my $b = shift;
+
+    if (not defined $a) {
+        return $b;
+    } elsif (not defined $b) {
+        return $a;
+    } elsif (not $a) {
+        return $b;
+    } elsif (not $b) {
+        return $a;
+    } elsif ($a < $b) {
+        return $a;
+    } else {
+        return $b;
+    }
+}
+
+
 =item Connect()
 
 The C<Connect()> constructor creates and returns a database connection
@@ -455,25 +496,23 @@ sub Connect($@)
     my %Options;
 
     ##
-    ## Handle $self->Connect('SomeConfig') or any odd number
+    ## Handle $self->Connect('SomeConfig')
     ##
-    if (@_ % 2 and $class->LocalConfig($_[0]))
+    if (@_ % 2 != 0)
     {
-        my $arg = shift;
-        $config_name = $arg;
-        %Options = (%{$class->LocalConfig($arg)}, @_);
+        $config_name = shift;
+        if (my $config = $class->LocalConfig($config_name))
+        {
+            %Options = (%{$config}, @_);
+        }
+        else
+        {
+            die "unknown local config \"$config_name\", or bad number of arguments to Connect: " . join(", ", $config_name, @_);
+        }
     }
     else
     {
         %Options = @_;
-    }
-
-    ##
-    ## Expecting hash-style arguments.
-    ##
-    if (@_ % 2)
-    {
-        die "bad number of arguments to Connect -- " . join " ", @_;
     }
 
     my $UseSlave = delete($Options{UseSlave});
@@ -499,7 +538,6 @@ sub Connect($@)
 
     ##
     ## Fetch the arguments.
-    ## Allow 'Db' for 'DB'.
     ##
     my $DB       =  delete($Options{DB})   || $class->DefaultDB();
     my $User     =  delete($Options{User}) || $class->DefaultUser($DB);
@@ -624,7 +662,7 @@ sub Connect($@)
         }
     }
 
-    print "DSN: $dsn\n" if $ENV{DEBUG};
+    warn "DSN: $dsn\n" if $ENV{DEBUG};
 
     ##
     ## If we're not looking for a unique connection, and we already have
@@ -641,6 +679,16 @@ sub Connect($@)
 
             return $db;
         }
+    }
+
+
+    if ($Host and my $Override = $ConnectTimeoutOverrideByHost{$Host})
+    {
+        $Timeout = ShorterTimeout($Timeout, $Override);
+    }
+    elsif ($ConnectTimeoutOverride)
+    {
+        $Timeout = ShorterTimeout($Timeout, $ConnectTimeoutOverride);
     }
 
     my $self = {
@@ -670,9 +718,22 @@ sub Connect($@)
 
     $self = bless $self, $class;
 
-    if ($ENV{DBIxDWIW_VERBOSE})
-    {
+    if ($ENV{DBIxDWIW_VERBOSE}) {
         $self->{VERBOSE} = 1;
+    }
+
+    if (my $routine = $self->can("PreConnectHook")) {
+        $routine->($self);
+    }
+
+    if ($ENV{DBIxDWIW_CONNECTION_DEBUG}) {
+        require Data::Dumper;
+
+        local($Data::Dumper::Indent) = 2;
+        local($Data::Dumper::Purity) = 0;
+        local($Data::Dumper::Terse)  = 1;
+
+        Carp::cluck("DBIx::DWIW Connecting:\n" . Data::Dumper::Dumper($self) . "\n\t");
     }
 
     my $dbh;
@@ -702,9 +763,14 @@ sub Connect($@)
             };
             if ($@ eq "alarm\n")
             {
+                if (my $routine = $self->can("ConnectTimeoutHook")) {
+                    $routine->($self);
+                }
+
                 my $timeout = $self->{TIMEOUT};
                 undef $self; # this fires the DESTROY, which sets $@, so must
                              # do before setting $@ below.
+
                 $@ = "connection timeout ($timeout sec passed)";
                 return ();
             }
@@ -829,7 +895,8 @@ sub Disconnect($)
 
     if (not $self->{DBH})
     {
-        $@ = "not connected in Disconnect()";
+        # Not an error, since this gets called as part of the destructor --
+        # might not be connected even though the object exists.
         return ();
     }
 
@@ -1015,6 +1082,10 @@ sub _Execute()
             };
             if ($@ eq "alarm\n")
             {
+                if (my $routine = $self->can("ExecuteTimeoutHook")) {
+                    $routine->($self, $statement);
+                }
+
                 $@ = "query timeout ($self->{TIMEOUT} sec passed)";
                 return ();
             }
@@ -1041,11 +1112,12 @@ sub _Execute()
                      $err =~ m/server has gone away/
                      or
                      $err =~ m/Server shutdown in progress/
-                    )
-                and
-                $self->RetryWait($err))
+                    ))
             {
-                next;
+                if ($self->RetryWait($err))
+                {
+                    next;
+                }
             }
 
             ## It is really an error that we cannot (or should not)
@@ -1175,7 +1247,7 @@ sub Prepare($$;$)
 
     ## Automatically cache the prepare if there are bind args.
 
-    my $dbi_sth = $has_bind ? 
+    my $dbi_sth = $has_bind ?
           $self->{DBH}->prepare_cached($sql) :
           $self->{DBH}->prepare($sql);
 
