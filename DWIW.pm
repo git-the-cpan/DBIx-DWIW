@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.103 2003/03/21 22:13:30 jzawodn Exp $
+## $Id: DWIW.pm,v 1.106 2003/04/17 06:03:30 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.31';
+$VERSION = '0.32';
 $SAFE    = 1;
 
 =head1 NAME
@@ -74,7 +74,7 @@ Rather than store the various connection parameters (username,
 password, hostname, port number, database name) in each and every
 script or application which needs them, you can easily put them in
 once place--or even generate them on the fly by writing a bit of
-custom cdoe.
+custom code.
 
 If this is all you need, consider looking at Brian Aker's fine
 C<DBIx::Password> module on the CPAN.  It may be sufficient.
@@ -102,7 +102,7 @@ As of version 0.25, three transaction related methods were added to
 DWIW.  These methods were designed to make transaction programming
 easier in a couple of ways.
 
-Consider a code snipit like this:
+Consider a code snippet like this:
 
   sub do_stuff_with_thing
   {
@@ -160,7 +160,7 @@ In that way, you can avoid problems that might be caused by not
 calling C<Begin()> and C<Commit()> the same number of times.  Once a
 named transaction is begun, the module will simply ignore any
 C<Begin()> or C<Commit()> calls that don't have a name or whose name
-don't match that assigned to the currently open transaction.
+doesn't match that assigned to the currently open transaction.
 
 The only exception to this rule is C<Rollback()>.  Because a
 transaction rollback usually signifies a big problem, calling
@@ -204,7 +204,7 @@ function or method not documented should be considered private.  If
 you call it, your code may break someday and it will be B<your> fault.
 
 The methods follow the Perl tradition of returning false values when
-an error cocurs (an usually setting $@ with a descriptive error
+an error occurs (and usually setting $@ with a descriptive error
 message).
 
 Any method which takes an SQL query string can also be passed bind
@@ -297,7 +297,7 @@ will call C<die()>, so you may want to C<eval {...}> the call.  The
 C<NoAbort> option (described below) controls that behavior.
 
 C<Connect()> accepts ``hash-style'' key/value pairs as arguments.  The
-arguments which is recognizes are:
+arguments which it recognizes are:
 
 =over
 
@@ -308,7 +308,7 @@ connection on the local machine.
 
 =item User
 
-The database to user to authenticate as.
+The database user to authenticate as.
 
 =item Pass
 
@@ -332,11 +332,11 @@ The port number to connect to.
 
 Set to true to connect to a DBI::ProxyServer proxy.  You'll also need
 to set ProxyHost, ProxyKey, and ProxyPort.  You may also want to set
-ProxyKey and ProxyCypher.
+ProxyKey and ProxyCipher.
 
 =item ProxyHost
 
-The hostname name of the proxy server.
+The hostname of the proxy server.
 
 =item ProxyPort
 
@@ -352,7 +352,7 @@ encryption key (as a hex string).
 =item ProxyCipher
 
 If the proxy server requires encryption, supply the name of the
-package which provies encryption.  Typically this will be something
+package which provides encryption.  Typically this will be something
 like C<Crypt::DES> or C<Crypt::Blowfish>.
 
 =item Unique
@@ -364,18 +364,18 @@ parameters (User, Pass, DB, Host) will return the same open
 connection. If C<Unique> is true, it will return a connection distinct
 from all other connections.
 
-If you have a process with an active connection that fork(s), be aware
-that you can NOT share the connection between the parent and child.
+If you have a process with an active connection that fork()s, be aware
+that you CANNOT share the connection between the parent and child.
 Well, you can if you're REALLY CAREFUL and know what you're doing.
 But don't do it.
 
 Instead, acquire a new connection in the child. Be sure to set this
 flag when you do, or you'll end up with the same connection and spend
-a lot of time pulling your hair out over why the code does mysterous
+a lot of time pulling your hair out over why the code does mysterious
 things.
 
 As of version 0.27, DWIW also checks the class name of the caller and
-guarateeus unique connections across different classes.  So if you
+guarantees unique connections across different classes.  So if you
 call Connect() from SubClass1 and SubClass2, each class gets its own
 connection.
 
@@ -418,13 +418,13 @@ User, Pass, and Host. If any are not provided, there may be defaults
 that kick in. A local configuration package, such as the C<MyDBI>
 example class that comes with DBIx::DWIW, may provide appropriate
 default connection values for several database. In such a case, a
-client my be able to simply use:
+client may be able to simply use:
 
     my $db = MyDBI->Connect(DB => 'Finances');
 
 to connect to the C<Finances> database.
 
-as a convenience, you can just give the database name:
+As a convenience, you can just give the database name:
 
     my $db = MyDBI->Connect('Finances');
 
@@ -444,7 +444,7 @@ sub Connect($@)
     ##
     ##   Connect('Slave', 'ConfigName')
     ##
-    ## We'll try caling FindSlave() to find a slave server.
+    ## We'll try calling FindSlave() to find a slave server.
     ##
     if (@_ == 2 and ($_[0] eq 'Slave' or $_[0] eq 'ReadOnly'))
     {
@@ -663,7 +663,7 @@ sub Connect($@)
                 RetryCount  => 0,
 
                 ## Transaction info
-                BeginCount  => 0,  ## ++ on Begin, -- on Comit, reset Rollback
+                BeginCount  => 0,  ## ++ on Begin, -- on Commit, reset Rollback
                 TrxRunning  => 0,  ## true after a Begin
                 TrxName     => undef,
                };
@@ -758,9 +758,9 @@ sub Connect($@)
 
 =item Dump()
 
-Dump the interanal configuration to stdout.  This is mainly useful for
+Dump the internal configuration to stdout.  This is mainly useful for
 debugging DBIx::DWIW.  You probably don't need to call it unless you
-know what you're dong. :-)
+know what you're doing. :-)
 
 =cut
 
@@ -806,7 +806,7 @@ sub Timeout(;$)
 
 Closes the connection. Upon program exit, this is called automatically
 on all open connections. Returns true if the open connection was
-closed, false if there was no connection, or there was some other
+closed, false if there was no connection or there was some other
 error (with the error being returned in C<$@>).
 
 =cut
@@ -818,7 +818,7 @@ sub Disconnect($)
 
     if (not $self->{UNIQUE})
     {
-        delete $CurrentConnections{$self->{UNIQUE_KEY} . $class};
+        delete $CurrentConnections{$self->{UNIQUE_KEY}};
     }
 
     if (not $self->{DBH})
@@ -892,7 +892,7 @@ sub Quote($@)
 
 Returns the return code from the most recently Execute()d query.  This
 is what Execute() returns, so there's little reason to call it
-direclty.  But it didn't used to be that way, so old code may be
+directly.  But it didn't use to be that way, so old code may be
 relying on this.
 
 =cut
@@ -904,7 +904,7 @@ sub ExecuteReturnCode($)
 }
 
 ## Private version of Execute() that deals with statement handles
-## ONLY.  Given a staement handle, call execute and insulate it from
+## ONLY.  Given a statement handle, call execute and insulate it from
 ## common problems.
 
 sub _Execute()
@@ -1056,7 +1056,7 @@ sub Execute($$@)
 }
 
 ##
-## Do is a synonynm for Execute.
+## Do is a synonym for Execute.
 ##
 *Do = \&Execute;
 
@@ -1117,7 +1117,7 @@ sub Prepare($$;$)
 =item RecentSth()
 
 Returns the DBI statement handle (C<$sth>) of the most-recently
-I<successfuly executed> statement.
+I<successfully executed> statement.
 
 =cut
 
@@ -1175,7 +1175,7 @@ sub InsertedId($)
 
 Returns the number of rows affected for the most recently executed
 statement.  This is valid only if it was for a non-SELECT. (For
-SELECTs, count the return values). As per the DBI, the -1 is returned
+SELECTs, count the return values). As per the DBI, -1 is returned
 if there was an error.
 
 =cut
@@ -1195,7 +1195,7 @@ sub RowsAffected($)
 
 =item RecentSql()
 
-Returns the sql of the most recently executed statement.
+Returns the SQL of the most recently executed statement.
 
 =cut
 
@@ -1214,8 +1214,8 @@ sub RecentSql($)
 
 =item PreparedSql()
 
-Returns the sql of the most recently prepared statement.
-(Useful for showing sql that doesn't parse.)
+Returns the SQL of the most recently prepared statement.
+(Useful for showing SQL that doesn't parse.)
 
 =cut
 
@@ -1255,7 +1255,7 @@ C<Hashes()> for queries that might return multiple records.
 
 Because calling C<Hashes()> on a larger recordset can use a lot of
 memory, you may wish to call C<Hash()> once with a valid query and
-call it repetedly with no SQL to retrieve records one at a time.
+call it repeatedly with no SQL to retrieve records one at a time.
 It'll take more CPU to do this, but it is more memory efficient:
 
   my $record = $db->Hash("SELECT * FROM big_table");
@@ -1367,7 +1367,7 @@ sub Hashes($$@)
 
 Similar to C<Hash()>, but returns a list of values from the matched
 record. On error, the empty list is returned and the error can be
-found in C<$@>. If the query matches no records, the an empty list is
+found in C<$@>. If the query matches no records, an empty list is
 returned but C<$@> is false.
 
 The example at the bottom of page 50 of DuBois's I<MySQL> would return
@@ -1541,7 +1541,7 @@ sub FlatArray($$@)
 
 =item FlatArrayRef($sql)
 
-Works just like C<FlatArray()> but reutrns an reft to the array instead
+Works just like C<FlatArray()> but returns a ref to the array instead
 of copying it.  This is a big win if you have very large arrays.
 
 =cut
@@ -1637,11 +1637,13 @@ my $max = $dbh->CSV('select * from personnel');
 The example in the middle of page 50 of DuBois\'s I<MySQL> would
 return a value similar to:
 
-     my $item = '"Tyler","John","1790-03-29"\n
-                 "Buchanan","James","1791-04-23"\n
-                 "Polk","James K","1795-11-02"\n
-                 "Fillmore","Millard","1800-01-07",\n
-                 "Pierce","Franklin","1804-11-23"\n';
+     my $item = <<END_OF_CSV;
+     "Tyler","John","1790-03-29"
+     "Buchanan","James","1791-04-23"
+     "Polk","James K","1795-11-02"
+     "Fillmore","Millard","1800-01-07",
+     "Pierce","Franklin","1804-11-23"
+     END_OF_CSV
 
 =cut
 
@@ -1720,7 +1722,7 @@ sub Verbose()
 =item Quiet()
 
 When errors occur, a message will be sent to STDOUT if Quiet is true
-(it is by default).  Pass a false value to disble it.
+(it is by default).  Pass a false value to disable it.
 
 Returns the current value.
 
@@ -1757,7 +1759,7 @@ but in unsafe mode you could use:
 
 The rationale behind having a safe mode is that you probably don't
 want to mix DBIx::DWIW and DBI method calls on an object unless you
-know what you're doing.  You need to opt-in.
+know what you're doing.  You need to opt in.
 
 C<Safe()> returns the current value.
 
@@ -1848,7 +1850,7 @@ sub _OperationSuccessful($)
     {
         my $now   = localtime;
         my $since = localtime($self->{RetryStart});
-        warn "$now: $self->{DESC} is back up (down sice $since)\n";
+        warn "$now: $self->{DESC} is back up (down since $since)\n";
     }
 
     if ($self->{RetryCommand}) {
@@ -2023,7 +2025,7 @@ sub DefaultHost($$)
 
 =item DefaultPort($config_name)
 
-Returns the default Port number for the given configuration.  Calls
+Returns the default port number for the given configuration.  Calls
 C<LocalConfig()> to get it.
 
 =cut
@@ -2056,7 +2058,7 @@ sub DefaultPort($$)
 
 =item Begin([name)
 
-Begin a new transaction, optinally naming it.
+Begin a new transaction, optionally naming it.
 
 =cut
 
@@ -2178,7 +2180,7 @@ sub Commit
             return 0;
         }
 
-        ## if the commit was named, the names neeed to match.
+        ## if the commit was named, the names need to match.
         if ($name ne $self->{TrxName})
         {
             print "Commit() skipping named commit due to name mismatch\n"
@@ -2253,7 +2255,7 @@ sub Rollback
 
 =head1 The DBIx::DWIW::Statement CLASS
 
-Calling C<Prepre()> on a database handle returns a
+Calling C<Prepare()> on a database handle returns a
 DBIx::DWIW::Statement object which acts like a limited DBI statement
 handle.
 
@@ -2301,7 +2303,7 @@ sub AUTOLOAD
 ## which $db object to use for execution.  Luckily that was stashed
 ## away in $self->{PARENT} when the statement was created.  So we call
 ## the _Execute method on our parent $db object and pass ourselves.
-## Sice $db->_Execute() only accepts Statement objects, this is just
+## Since $db->_Execute() only accepts Statement objects, this is just
 ## as it should be.
 
 =pod
@@ -2344,7 +2346,7 @@ sub DESTROY
 =head1 AUTHORS
 
 DBIx::DWIW evolved out of some Perl modules that we developed and used
-in Yahoo! Finance (http://finance.yahoo.com).  The folowing people
+in Yahoo! Finance (http://finance.yahoo.com).  The following people
 contributed to its development:
 
   Jeffrey Friedl (jfriedl@yahoo.com)
@@ -2361,6 +2363,7 @@ along the way:
   David Yan (davidyan@yahoo-inc.com)
   DH <crazyinsomniac@yahoo.com>
   Toby Elliott (telliott@yahoo-inc.com)
+  Keith C. Ivey (keith@smokefreedc.org)
 
 Please direct comments, questions, etc to Jeremy for the time being.
 Thanks.
@@ -2377,7 +2380,7 @@ specified in the Perl README file.
 L<DBI>, L<perl>
 
 Jeremy's presentation at the 2001 Open Source Database Summit, which
-introduced DBIx::DWIW is availble from:
+introduced DBIx::DWIW is available from:
 
   http://jeremy.zawodny.com/mysql/
 

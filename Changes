@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.32  Thu Apr 17, 2003
+
+    - fix bug in UNIQUE_KEY and %CurrentConnections which caused
+      connections not to be removed from the cache
+
 0.31  Fri Mar 21, 2003
 
     - don't let RetryWait() get called when a transaction is running
