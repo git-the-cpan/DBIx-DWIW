@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.119 2004/09/10 06:51:50 jfriedl Exp $
+## $Id: DWIW.pm,v 1.120 2004/09/24 05:36:41 jfriedl Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -795,6 +795,17 @@ sub Connect($@)
 
         if (not ref $dbh)
         {
+            if (not $DBI::errstr and $@)
+            {
+                ##
+                ## Must be a problem with loading DBD or something --
+                ## a *perl* problem as opposed to a network/credential
+                ## problem. If we clear $Retry now, we'll ensure to drop
+                ## into the die 'else' clause below.
+                ##
+                $Retry = 0;
+            }
+
             if ($Retry
                 and
                 ($DBI::errstr =~ m/can\'t connect/i
@@ -807,10 +818,30 @@ sub Connect($@)
             }
             else
             {
-                warn "$DBI::errstr" if not $Quiet;
-                my $ERROR = $@ = "can't connect to database: $DBI::errstr";
-                die $@ unless $NoAbort;
+                my $ERROR = ($DBI::errstr || $@ || "internal error");
+                warn "ERROR IS[$ERROR]\n";
+
+                ##
+                ## If DBI::ProxyServer is being used and the target mmysql
+                ## server refuses the connection (wrong password, trying to
+                ## access a db that they've not been given permission for,
+                ## etc.) DBI::ProxyServer just reports "Unexpected EOF from
+                ## server". Let's give the user a hint as to what that
+                ## might mean.
+                ##
+                if ($ERROR =~ m/^Cannot log in to DBI::ProxyServer: Unexpected EOF from server/) {
+                    $ERROR =    "Cannot log in via DBI::ProxyServer: Unexpected EOF from server (check user's MySQL credentials and privileges)";
+                }
+                if (not $NoAbort) {
+                    die $ERROR;
+                }
+                elsif (not $Quiet) {
+                    warn $ERROR;
+                }
+
+                $@ = $ERROR;
                 $self->_OperationFailed();
+
                 undef $self; # This fires the DESTROY, which sets $@.
                 $@ = $ERROR; # Just in case the DESTROY did set $@.
                 return ();

@@ -1,8 +1,13 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.42  Seep 24, 2004
+
+    - Handle perl failures in a connect attempt (e.g. inability
+      to load an underlying module).
+
 0.41  Sep 13, 2004
 
-    - This release has seperate Tiemout and QueryTimeout args for the
+    - This release has separate Timeout and QueryTimeout args for the
       Connect() method.
 
 0.40  Sep 08, 2004
@@ -26,10 +31,10 @@ Revision history for Perl extension DBIx::DWIW.
 0.35  Feb 04, 2004
 
     - Make code match documentation for the NoRetry option.  It only
-      affectes the initial connection.
+      affects the initial connection.
 
-    - RetryWait now retries immedately a few times, before pausing.
-      This provides faster re-connects to healty servers.
+    - RetryWait now retries immediately a few times, before pausing.
+      This provides faster re-connects to healthy servers.
 
     - Fixed some doc misspellings and updated contributors list.
 
@@ -75,7 +80,7 @@ Revision history for Perl extension DBIx::DWIW.
     - invoke the Retry/Wait logic on InnoDB deadlocks.
 
     - revised format of the Changes file so it's easier to read and
-      edit.  It shoudl be auto-generated, but the check-in messages
+      edit.  It should be auto-generated, but the check-in messages
       aren't always clear.
 
 0.28  Mon Nov 4, 2002
@@ -84,7 +89,7 @@ Revision history for Perl extension DBIx::DWIW.
 
 0.27  Mon Oct 28, 2002
 
-    - put class checkign in Connect().  See the description of
+    - put class checking in Connect().  See the description of
       Connect() fot details
 
 0.26  ???
@@ -155,4 +160,3 @@ Revision history for Perl extension DBIx::DWIW.
 0.01  Fri Sep 14 13:58:52 2001
 	- original version; created by h2xs 1.21 with options
 		-X -n DBIx::DWIW
-
