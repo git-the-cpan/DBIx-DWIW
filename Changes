@@ -13,8 +13,14 @@ Revision history for Perl extension DBIx::DWIW.
 0.08  Mon Oct 16 12:25:41 2001
 	- added a $sth->finish() call in DESTROY() for statements.
 
-0.09  Wed Oct 16 12:25:41 2001
+0.09  Wed Oct 16 11:01:41 2001
 	- move DESTROY() code to Disconnect() where it belongs.
 
+0.10  Wed Oct 16 11:07:41 2001
+	- I was dumb.
 
-	
+0.11  Tue Oct 23 23:58:52 2001
+	- Improve "not connected" error messages.
+
+0.12  WEd Oct 24 09:51:57 2001
+	- Add Port connection parameter.

@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.23 2001/10/17 18:04:41 jzawodn Exp $
+## $Id: DWIW.pm,v 1.28 2001/10/24 16:52:51 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -8,7 +8,7 @@ use 5.005;
 use strict;
 use vars qw[$VERSION $SAFE];
 
-$VERSION = '0.10';
+$VERSION = '0.12';
 $SAFE    = 1;
 
 =head1 NAME
@@ -213,6 +213,10 @@ NOT IMPLEMENTED.
 
 The path to the Unix socket to use.
 
+=item Port
+
+The port number to connect to.
+
 =item Unique
 
 A boolean which controls connection reuse.
@@ -263,13 +267,13 @@ example class that comes with DBIx::DWIW, may provide appropriate
 default connection values for several database. In such a case, a
 client my be able to simply use:
 
-    my $db = MyDBI->Conenct(DB => 'Finances');
+    my $db = MyDBI->Connect(DB => 'Finances');
 
 to connect to the C<Finances> database.
 
 as a convenience, you can just give the database name:
 
-    my $db = MyDBI->Conenct('Finances');
+    my $db = MyDBI->Connect('Finances');
 
 See the local configuration package appropriate to your installation
 for more information about what is and isn't preconfigured.
@@ -320,6 +324,7 @@ sub Connect($@)
     my $DB       =  delete($Options{DB})   || $class->DefaultDB();
     my $User     =  delete($Options{User}) || $class->DefaultUser($DB);
     my $Password =  delete($Options{Pass}) || $class->DefaultPass($DB, $User);
+    my $Port     =  delete($Options{Port}) || $class->DefaultPort($DB);
     my $Unique   =  delete($Options{Unique});
     my $Retry    = !delete($Options{NoRetry});
     my $Quiet    =  delete($Options{Quiet});
@@ -378,12 +383,26 @@ sub Connect($@)
 
     if (defined $Host)
     {
-        $desc = "connection to $Host\'s MySql server from $myhost";
+        $desc = "connection to $Host\'s MySQL server from $myhost";
     }
     else
     {
-        $desc = "local connection to MySql server on $myhost";
+        $desc = "local connection to MySQL server on $myhost";
     }
+
+    ## build connection string
+
+    my $dsn;
+
+    if ($Port)
+    {
+        $dsn = "DBI:mysql:$DB:$Host;port=$Port;mysql_client_found_rows=1";
+    }
+    else
+    {
+        $dsn = "DBI:mysql:$DB:$Host;mysql_client_found_rows=1";
+    }
+
 
     ##
     ## If we're not looking for a unique connection, and we already have
@@ -391,8 +410,8 @@ sub Connect($@)
     ##
     if (not $Unique)
     {
-        if (my $db = $CurrentConnections{$Host,$User,$Password,$DB}) {
-
+        if (my $db = $CurrentConnections{$dsn})
+        {
             if (defined $Verbose)
             {
                 $db->{VERBOSE} = 1;
@@ -412,6 +431,7 @@ sub Connect($@)
               RETRY      => $Retry,
               UNIQUE     => $Unique,
               USER       => $User,
+              PORT       => $Port,
               VERBOSE    => $Verbose,
               SAFE       => $SAFE,
               RetryCount => 0,
@@ -420,8 +440,7 @@ sub Connect($@)
     $db = bless $db, $class;
 
   RETRY:
-    my $dbh = DBI->connect("DBI:mysql:$DB:$Host;mysql_client_found_rows=1",
-                           $User, $Password, { PrintError => 0 });
+    my $dbh = DBI->connect($dsn, $User, $Password, { PrintError => 0 });
 
     if (not ref $dbh)
     {
@@ -450,7 +469,7 @@ sub Connect($@)
     ##
     ## Save this one if it's not to be unique.
     ##
-    $CurrentConnections{$Host,$User,$Password,$DB} = $db if not $Unique;
+    $CurrentConnections{$dsn} = $db if not $Unique;
     return $db;
 }
 
@@ -476,7 +495,7 @@ sub Disconnect($)
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in Disconnect()";
         return ();
     }
 
@@ -647,7 +666,7 @@ sub Execute()
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in Execute()";
         Carp::croak "not connected to the database" unless $self->{QUIET};
     }
 
@@ -685,7 +704,7 @@ sub Prepare($$;$)
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in Prepare()";
 
         if (not $self->{QUIET})
         {
@@ -865,7 +884,7 @@ sub Hash()
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in Hash()";
         return ();
     }
 
@@ -925,7 +944,7 @@ sub Hashes()
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in Hashes()";
         return ();
     }
 
@@ -972,7 +991,7 @@ sub Array($$;$@)
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected Array()";
         return ();
     }
 
@@ -1034,7 +1053,7 @@ sub Arrays()
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected Arrays()";
         return ();
     }
 
@@ -1096,7 +1115,7 @@ sub FlatArray()
 
     if (not $self->{DBH})
     {
-        $@ = "not connected";
+        $@ = "not connected in FlatArray()";
         return ();
     }
 
@@ -1316,6 +1335,7 @@ package like:
     sub DefaultUser { "defaultuser"        }
     sub DefaultPass { "paSSw0rd"           }
     sub DefaultHost { "mysql.somehost.com" }
+    sub DefaultPort { 3306                 }
 
 The four routines override those in C<DBIx::DWIW>, and explicitly
 provide exactly what's needed to contact the given database.
@@ -1434,6 +1454,28 @@ sub DefaultHost($$)
     if (my $DbConfig = $class->LocalConfig($DB))
     {
         if ($DbConfig->{Host})
+        {
+                return $DbConfig->{Host};
+        }
+    }
+    return undef;
+}
+
+=pod
+
+=item DefaultPort($config_name)
+
+Returns the default Port number for the given configuration.  Calls
+C<LocalConfig()> to get it.
+
+=cut
+
+sub DefaultPort($$)
+{
+    my ($class, $DB) = @_;
+    if (my $DbConfig = $class->LocalConfig($DB))
+    {
+        if ($DbConfig->{Port})
         {
             if ($DbConfig->{Host} eq hostname)
             {
