@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.24  Mon Apr  8 17:24:47 2002
+	- added Dump() method for debugging what's going on
+
 0.23  Fri Mar 29 00:10:47 2002
 	- implement Timeout option in Connect() as documented
 

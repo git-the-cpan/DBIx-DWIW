@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.76 2002/03/29 22:29:09 jzawodn Exp $
+## $Id: DWIW.pm,v 1.77 2002/04/09 00:23:52 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.23';
+$VERSION = '0.24';
 $SAFE    = 1;
 
 =head1 NAME
@@ -646,6 +646,25 @@ sub Connect($@)
 }
 
 *new = \&Connect;
+
+=item Dump()
+
+Dump the interanal configuration to stdout.  This is mainly useful for
+debugging DBIx::DWIW.  You probably don't need to call it unless you
+know what you're dong. :-)
+
+=cut
+
+sub Dump
+{
+    my $self = shift;
+
+    ## Trivial dumping of key/value pairs.
+    for my $key (sort keys %$self)
+    {
+        print "$key: $self->{$key}\n";
+    }
+}
 
 =item Timeout()
 
