@@ -1,5 +1,11 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.25  Thu Jun  6 16:01:11
+	- added Begin(), Commit(), and Rollback() for safe transaction
+		handling
+	- cleaned up the output of Dump() so that it doesn't try to
+		dump keys with undef values.
+
 0.24  Mon Apr  8 17:24:47 2002
 	- added Dump() method for debugging what's going on
 

@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.77 2002/04/09 00:23:52 jzawodn Exp $
+## $Id: DWIW.pm,v 1.81 2002/06/06 23:04:45 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 $SAFE    = 1;
 
 =head1 NAME
@@ -95,6 +95,107 @@ happens. Rather than have your application die, DBIx::DWIW provides a
 way to handle outages.  You can build custom wait/retry/fail logic
 which does anything you might want (such as ringing your pager or
 sending e-mail).
+
+=head2 Transaction Handling
+
+As of version 0.25, three transaction related methods were added to
+DWIW.  These methods were designed to make transaction programming
+easier in a couple of ways.
+
+Consider a code snipit like this:
+
+  sub do_stuff_with_thing
+  {
+      $db->Begin();
+      $db->Execute("some sql here");
+      $db->Execute("another query here");
+      $db->Commit();
+  }
+
+That's all well an good.  You have a function that you can call and it
+will perform 2 discrete actions as part of a transaction.  However,
+what if you need to call that in the context of a larger transaction
+from time to time?  What you'd like to do is this:
+
+  $db->Begin();
+  for my $thing (@thing_list)
+  {
+      do_stuff_with_thing($thing);
+  }
+  $db->Commit();
+
+and have it all wrapped up in once nice juicy transaction.
+
+With DBIx::DWIW, you can.  That is, in fact, the default behavior.
+You can call C<Begin()> as many times as you want, but it'll only ever
+let you start a single transaction until you call the corresponding
+commit.  It does this by tracking the number of times you call
+C<Begin()> and C<Commit()>.  A counter is incremented each time you
+call C<Begin()> and decremented each time you call C<Commit()>.  When
+the count reaches zero, the original transaction is actually
+committed.
+
+Of course, there are problems with that method, so DBIx::DWIW provides
+an alternative.  You can use I<named transactions>.  Using named
+transactions instead, the code above would look like this:
+
+  sub do_stuff_with_thing
+  {
+      $db->Begin('do_stuff transaction');
+      $db->Execute("some sql here");
+      $db->Execute("another query here");
+      $db->Commit('do_stuff transaction');
+  }
+
+and:
+
+  $db->Begin('Big Transaction');
+  for my $thing (@thing_list)
+  {
+      do_stuff_with_thing($thing);
+  }
+  $db->Commit('Big Transaction');
+
+In that way, you can avoid problems that might be caused by not
+calling C<Begin()> and C<Commit()> the same number of times.  Once a
+named transaction is begun, the module will simply ignore any
+C<Begin()> or C<Commit()> calls that don't have a name or whose name
+don't match that assigned to the currently open transaction.
+
+The only exception to this rule is C<Rollback()>.  Because a
+transaction rollback usually signifies a big problem, calling
+C<Rollback()> will B<always> end the currently running transaction.
+
+Return values for these functions are a bit different, too.
+C<Begin()> and C<Commit()> can return undef, 0, or 1.  undef means
+there was an error.  0 means that nothing was done (but there was no
+error either), and 1 means that work was done.
+
+The methods are:
+
+=over
+
+=item Begin
+
+Start a new transaction if one is not already running.
+
+=item Commit
+
+Commit the current transaction, if one is running.
+
+=item Rollback
+
+Rollback the current transaction, if one is running.
+
+=back
+
+See the detailed method descriptions below for all the gory details.
+
+Note that C<Begin()>, C<Commit()>, and C<Rollback()> are not protected
+by DBIx::DWIW's normal wait/retry logic if a network connection fails.
+This because I'm not sure that it it makes sense.  If your connection
+drops and the other end notices, it'll probably rollback for you
+anyway.
 
 =head1 DBIx::DWIW CLASS METHODS
 
@@ -545,21 +646,27 @@ sub Connect($@)
     }
 
     my $self = {
-                DB         => $DB,
-                DBH        => undef,
-                DESC       => $desc,
-                HOST       => $Host,
-                PASS       => $Password,
-                QUIET      => $Quiet,
-                RETRY      => $Retry,
-                UNIQUE     => $Unique,
-                USER       => $User,
-                PORT       => $Port,
-                VERBOSE    => $Verbose,
-                SAFE       => $SAFE,
-                DSN        => $dsn,
-                TIMEOUT    => $Timeout,
-                RetryCount => 0,
+                ## Connection info
+                DB          => $DB,
+                DBH         => undef,
+                DESC        => $desc,
+                HOST        => $Host,
+                PASS        => $Password,
+                QUIET       => $Quiet,
+                RETRY       => $Retry,
+                UNIQUE      => $Unique,
+                USER        => $User,
+                PORT        => $Port,
+                VERBOSE     => $Verbose,
+                SAFE        => $SAFE,
+                DSN         => $dsn,
+                TIMEOUT     => $Timeout,
+                RetryCount  => 0,
+
+                ## Transaction info
+                BeginCount  => 0,  ## ++ on Begin, -- on Comit, reset Rollback
+                TrxRunning  => 0,  ## true after a Begin
+                TrxName     => undef,
                };
 
     $self = bless $self, $class;
@@ -662,7 +769,7 @@ sub Dump
     ## Trivial dumping of key/value pairs.
     for my $key (sort keys %$self)
     {
-        print "$key: $self->{$key}\n";
+        print "$key: $self->{$key}\n" unless not defined $self->{$key};
     }
 }
 
@@ -1472,10 +1579,10 @@ sub Scalar()
 
         if ($sth->rows() > 1 or $sth->{NUM_OF_FIELDS} > 1)
         {
-	  warn "$sql in DWIW::Scalar returned more than 1 row and/or column";
+          warn "$sql in DWIW::Scalar returned more than 1 row and/or column";
         }
-	my $ref = $sth->fetchrow_arrayref;
-	$ret = ${$ref}[0];
+        my $ref = $sth->fetchrow_arrayref;
+        $ret = ${$ref}[0];
     }
     return $ret;
 }
@@ -1525,15 +1632,15 @@ sub CSV()
             my $col = 0;
             foreach (@{$ref})
             {
-	        if (defined($_)) {
-		  $ret .= ($sth->{mysql_type_name}[$col++] =~
-			   /(char|text|binary|blob)/) ?
-			     "\"$_\"," : "$_,";
-		} else {
-		  $ret .= "NULL,";
-		}
-	    }
-	    $ret =~ s/,$/\n/;
+                if (defined($_)) {
+                  $ret .= ($sth->{mysql_type_name}[$col++] =~
+                           /(char|text|binary|blob)/) ?
+                             "\"$_\"," : "$_,";
+                } else {
+                  $ret .= "NULL,";
+                }
+            }
+            $ret =~ s/,$/\n/;
         }
     }
     return $ret;
@@ -1893,6 +2000,200 @@ sub DefaultPort($$)
     }
     return undef;
 }
+
+=pod
+
+=head2 Transaction Methods
+
+=over
+
+=item Begin([name)
+
+Begin a new transaction, optinally naming it.
+
+=cut
+
+sub Begin
+{
+    my $self = shift;
+    my $name = shift;
+
+    ## if one is already running, just increment count if we need to
+    if ($self->{TrxRunning})
+    {
+        print "Begin() called with running transaction - " if $self->{VERBOSE};
+        if ($self->{BeginCount} and not defined $name)
+        {
+            print "$self->{BeginCount}\n" if $self->{VERBOSE};
+            $self->{BeginCount}++;
+            return 0;
+        }
+        else
+        {
+            print "$self->{TrxName}\n" if $self->{VERBOSE};
+            return 0;
+        }
+    }
+
+    print "Begin() starting new transaction - " if $self->{VERBOSE};
+
+    ## it is either named or not.
+    if (defined $name)
+    {
+        $self->{TrxName} = $name;
+        print "$name\n" if $self->{VERBOSE};
+    }
+    else
+    {
+        $self->{BeginCount} = 1;
+        print "(auto-count)\n" if $self->{VERBOSE};
+    }
+
+    ## tell DBI to disable AutoCommit and begin the transaction
+    $self->{DBH}->{AutoCommit} = 0;
+    my $rc = $self->{DBH}->begin_work;
+    $self->{TrxRunning} = 1;
+    return $rc;
+}
+
+=pod
+
+=item Commit([name)
+
+Commit the current transaction (or named transaction).
+
+=cut
+
+sub Commit
+{
+    my $self = shift;
+    my $name = shift;
+
+    ## if there is no transaction running now
+    if (not $self->{TrxRunning})
+    {
+        print "Commit() called without a transaction\n" if $self->{VERBOSE};
+        return 0;
+    }
+
+    ## if the controlling transaction was auto-counting
+    if ($self->{BeginCount})
+    {
+        ## if this commit was named, skip it.
+        if (defined $name)
+        {
+            print "Commit() skipping named commit on auto-counting transaction"
+                if $self->{VERBOSE};
+            return 0;
+        }
+
+        ## decrement
+        $self->{BeginCount}--;
+
+        ## need to commit
+        if ($self->{BeginCount} == 0)
+        {
+            print "Commit()ing auto-coutning transaction\n" if $self->{VERBOSE};
+            my $rc = $self->{DBH}->commit;
+            $self->{DBH}->{AutoCommit} = 1;
+            $self->{TrxRunning} = 0;
+            $self->{BeginCount} = 0;
+            $self->{TrxName}    = undef;   ## just in case
+            return $rc;
+        }
+        elsif ($self->{BeginCount} > 0)
+        {
+            print "Commit() decremented BeginCount\n" if $self->{VERBOSE};
+            return 0;
+        }
+        else
+        {
+            print "Commit() is confused -- BeginCount went negative!\n"
+                if $self->{VERBOSE};
+            $@ = "Commit() is confused.  BeginCount went negative!";
+            return undef;
+        }
+
+    }
+
+    ## if the controlling transaction was named, deal with it.
+
+    if (defined $self->{TrxName})
+    {
+        ## if the commit was not named, do nothing.
+        if (not defined $name)
+        {
+            print "Commit() skipping unnamed commit on named begin\n"
+                if $self->{VERBOSE};
+            return 0;
+        }
+
+        ## if the commit was named, the names neeed to match.
+        if ($name ne $self->{TrxName})
+        {
+            print "Commit() skipping named commit due to name mismatch\n"
+                if $self->{VERBOSE};
+            return 0;
+        }
+
+        my $rc;
+
+        ## if they match, commit.
+        if ($name eq $self->{TrxName})
+        {
+            print "Commit()ing transaction - $self->{TrxName}\n"
+                if $self->{VERBOSE};
+            $rc = $self->{DBH}->commit;
+            $self->{DBH}->{AutoCommit} = 1;
+            $self->{TrxRunning} = 0;
+            $self->{BeginCount} = 0;      ## just in case
+            $self->{TrxName}    = undef;
+            return $rc;
+        }
+    }
+
+    ## otherwise, we're confused.  we should never end up here.
+    else
+    {
+        print "Commit() is confused -- something is wonky\n" if $self->{VERBOSE};
+        $@ = "Commit() is confused.  Internal state problem.";
+        return undef;
+    }
+
+}
+
+=pod
+
+=item Rollback()
+
+Rollback the current transaction.
+
+=cut
+
+sub Rollback
+{
+    my $self = shift;
+
+    if (not $self->{TrxRunning})
+    {
+        print "Rollback() called without a transaction\n" if $self->{VERBOSE};
+        return;
+    }
+
+    ## rollback via DBI and reset things
+    my $rc = $self->{DBH}->rollback;
+    $self->{TrxRunning} = 0;
+    $self->{BeginCount} = 0;
+    $self->{TrxName}    = undef;
+    print "Rollback() transaction\n" if $self->{VERBOSE};
+    return $rc;
+}
+
+=pod
+
+=back
+
+=cut
 
 ######################################################################
 
