@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.118 2004/09/04 11:37:38 jfriedl Exp $
+## $Id: DWIW.pm,v 1.119 2004/09/10 06:51:50 jfriedl Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -41,65 +41,62 @@ When sub-classed for full functionality:
 
 =head1 DESCRIPTION
 
-NOTE: This module is currently specific to MySQL, but needn't be.  We
-just haven't had a need to talk to any other database server.
+NOTE: This module is currently specific to MySQL, but needn't be. We just
+haven't had a need to talk to any other database server.
 
-DBIx::DWIW was developed (over the course of roughly 1.5 years) in
-Yahoo! Finance (http://finance.yahoo.com/) to suit our needs.  Parts
-of the API may not make sense and the documentation may be lacking in
-some areas.  We've been using it for so long (in one form or another)
-that these may not be readily obvious to us, so feel free to point
-that out.  There's a reason the version number is currently < 1.0.
+DBIx::DWIW was developed (over the course of roughly 1.5 years) in Yahoo!
+Finance (http://finance.yahoo.com/) to suit our needs. Parts of the API may
+not make sense and the documentation may be lacking in some areas. We've
+been using it for so long (in one form or another) that these may not be
+readily obvious to us, so feel free to point that out. There's a reason the
+version number is currently < 1.0.
 
-This module was B<recently> extracted from Yahoo-specific code, so
-things may be a little strange yet while we smooth out any bumps and
-blemishes left over form that.
+This module was B<recently> extracted from Yahoo-specific code, so things
+may be a little strange yet while we smooth out any bumps and blemishes
+left over form that.
 
-DBIx::DWIW is B<intended to be sub-classed>.  Doing so gives you
-all the benefits it can provide and the ability to easily customize
-some of its features.  You can, of course, use it directly if it meets
-your needs as-is.  But you'll be accepting its default behavior in
-some cases where it may not be wise to do so.
+DBIx::DWIW is B<intended to be sub-classed>. Doing so gives you all the
+benefits it can provide and the ability to easily customize some of its
+features. You can, of course, use it directly if it meets your needs as-is.
+But you'll be accepting its default behavior in some cases where it may not
+be wise to do so.
 
 The DBIx::DWIW distribution comes with a sample sub-class in the file
-C<examples/MyDBI.pm> which illustrates some of what you might want to
-do in your own class(es).
+C<examples/MyDBI.pm> which illustrates some of what you might want to do in
+your own class(es).
 
 This module provides three main benefits:
 
 =head2 Centralized Configuration
 
-Rather than store the various connection parameters (username,
-password, hostname, port number, database name) in each and every
-script or application which needs them, you can easily put them in
-once place--or even generate them on the fly by writing a bit of
-custom code.
+Rather than store the various connection parameters (username, password,
+hostname, port number, database name) in each and every script or
+application which needs them, you can easily put them in once place--or
+even generate them on the fly by writing a bit of custom code.
 
 If this is all you need, consider looking at Brian Aker's fine
-C<DBIx::Password> module on the CPAN.  It may be sufficient.
+C<DBIx::Password> module on the CPAN. It may be sufficient.
 
 =head2 API Simplicity
 
-Taking a lesson from Python (gasp!), this module promotes one obvious
-way to do most things.  If you want to run a query and get the results
-back as a list of hashrefs, there's one way to do that.  The API may
-sacrifice speed in some cases, but new users can easily learn the
-simple and descriptive method calls.  (Nobody is forcing you to use
-it.)
+Taking a lesson from Python (gasp!), this module promotes one obvious way
+to do most things. If you want to run a query and get the results back as a
+list of hashrefs, there's one way to do that. The API may sacrifice speed
+in some cases, but new users can easily learn the simple and descriptive
+method calls. (Nobody is forcing you to use it.)
 
 =head2 Fault Tolerance
 
-Databases sometimes go down.  Networks flake out.  Bad stuff
-happens. Rather than have your application die, DBIx::DWIW provides a
-way to handle outages.  You can build custom wait/retry/fail logic
-which does anything you might want (such as ringing your pager or
-sending e-mail).
+Databases sometimes go down. Networks flake out. Bad stuff happens. Rather
+than have your application die, DBIx::DWIW provides a way to handle
+outages. You can build custom wait/retry/fail logic which does anything you
+might want (such as ringing your pager or sending e-mail).
 
 =head2 Transaction Handling
 
-As of version 0.25, three transaction related methods were added to
-DWIW.  These methods were designed to make transaction programming
-easier in a couple of ways.
+As of version 0.25, three transaction related methods were added to DWIW.
+These methods were designed to make transaction programming easier in a
+couple of ways.
 
 Consider a code snippet like this:
 
@@ -111,10 +108,10 @@ Consider a code snippet like this:
       $db->Commit();
   }
 
-That's all well an good.  You have a function that you can call and it
-will perform 2 discrete actions as part of a transaction.  However,
-what if you need to call that in the context of a larger transaction
-from time to time?  What you'd like to do is this:
+That's all well an good. You have a function that you can call and it will
+perform 2 discrete actions as part of a transaction. However, what if you
+need to call that in the context of a larger transaction from time to time?
+What you'd like to do is this:
 
   $db->Begin();
   for my $thing (@thing_list)
@@ -125,18 +122,17 @@ from time to time?  What you'd like to do is this:
 
 and have it all wrapped up in once nice juicy transaction.
 
-With DBIx::DWIW, you can.  That is, in fact, the default behavior.
-You can call C<Begin()> as many times as you want, but it'll only ever
-let you start a single transaction until you call the corresponding
-commit.  It does this by tracking the number of times you call
-C<Begin()> and C<Commit()>.  A counter is incremented each time you
-call C<Begin()> and decremented each time you call C<Commit()>.  When
-the count reaches zero, the original transaction is actually
-committed.
+With DBIx::DWIW, you can. That is, in fact, the default behavior. You can
+call C<Begin()> as many times as you want, but it'll only ever let you
+start a single transaction until you call the corresponding commit. It does
+this by tracking the number of times you call C<Begin()> and C<Commit()>. A
+counter is incremented each time you call C<Begin()> and decremented each
+time you call C<Commit()>. When the count reaches zero, the original
+transaction is actually committed.
 
-Of course, there are problems with that method, so DBIx::DWIW provides
-an alternative.  You can use I<named transactions>.  Using named
-transactions instead, the code above would look like this:
+Of course, there are problems with that method, so DBIx::DWIW provides an
+alternative. You can use I<named transactions>. Using named transactions
+instead, the code above would look like this:
 
   sub do_stuff_with_thing
   {
@@ -155,20 +151,20 @@ and:
   }
   $db->Commit('Big Transaction');
 
-In that way, you can avoid problems that might be caused by not
-calling C<Begin()> and C<Commit()> the same number of times.  Once a
-named transaction is begun, the module simply ignores any
-C<Begin()> or C<Commit()> calls that don't have a name or whose name
-doesn't match that assigned to the currently open transaction.
+In that way, you can avoid problems that might be caused by not calling
+C<Begin()> and C<Commit()> the same number of times. Once a named
+transaction is begun, the module simply ignores any C<Begin()> or
+C<Commit()> calls that don't have a name or whose name doesn't match that
+assigned to the currently open transaction.
 
-The only exception to this rule is C<Rollback()>.  Because a
-transaction rollback usually signifies a big problem, calling
-C<Rollback()> B<always> ends the currently running transaction.
+The only exception to this rule is C<Rollback()>. Because a transaction
+rollback usually signifies a big problem, calling C<Rollback()> B<always>
+ends the currently running transaction.
 
-Return values for these functions are a bit different, too.
-C<Begin()> and C<Commit()> can return undef, 0, or 1.  undef means
-there was an error.  0 means that nothing was done (but there was no
-error either), and 1 means that work was done.
+Return values for these functions are a bit different, too. C<Begin()> and
+C<Commit()> can return undef, 0, or 1. undef means there was an error. 0
+means that nothing was done (but there was no error either), and 1 means
+that work was done.
 
 The methods are:
 
@@ -190,29 +186,27 @@ Rollback the current transaction, if one is running.
 
 See the detailed method descriptions below for all the gory details.
 
-Note that C<Begin()>, C<Commit()>, and C<Rollback()> are not protected
-by DBIx::DWIW's normal wait/retry logic if a network connection fails.
-This because I'm not sure that it it makes sense.  If your connection
-drops and the other end notices, it'll probably rollback for you
-anyway.
+Note that C<Begin()>, C<Commit()>, and C<Rollback()> are not protected by
+DBIx::DWIW's normal wait/retry logic if a network connection fails. This
+because I'm not sure that it it makes sense. If your connection drops and
+the other end notices, it'll probably rollback for you anyway.
 
 =head1 DBIx::DWIW CLASS METHODS
 
-The following methods are available from DBIx::DWIW objects.  Any
-function or method not documented should be considered private.  If
-you call it, your code may break someday and it will be B<your> fault.
+The following methods are available from DBIx::DWIW objects. Any function
+or method not documented should be considered private. If you call it, your
+code may break someday and it will be B<your> fault.
 
-The methods follow the Perl tradition of returning false values when
-an error occurs (and usually setting $@ with a descriptive error
-message).
+The methods follow the Perl tradition of returning false values when an
+error occurs (and usually setting $@ with a descriptive error message).
 
-Any method which takes an SQL query string can also be passed bind
-values for any placeholders in the query string:
+Any method which takes an SQL query string can also be passed bind values
+for any placeholders in the query string:
 
   $db->Hashes("SELECT * FROM foo WHERE id = ?", $id);
 
-Any method which takes an SQL query string can also be passed a
-prepared DWIW statement handle:
+Any method which takes an SQL query string can also be passed a prepared
+DWIW statement handle:
 
   $db->Hashes($sth, $id);
 
@@ -227,10 +221,9 @@ prepared DWIW statement handle:
 my %CurrentConnections;
 
 ##
-## Autoload to trap method calls that we haven't defined.  The default
-## (when running in unsafe mode) behavior is to check $dbh to see if
-## it can() field the call.  If it can, we call it.  Otherwise, we
-## die.
+## Autoload to trap method calls that we haven't defined. The default (when
+## running in unsafe mode) behavior is to check $dbh to see if it can()
+## field the call. If it can, we call it. Otherwise, we die.
 ##
 
 use vars '$AUTOLOAD';
@@ -305,9 +298,12 @@ sub import
 our $ConnectTimeoutOverride;
 our %ConnectTimeoutOverrideByHost; ## on a per-host basis
 
+our $QueryTimeoutOverride;
+our %QueryTimeoutOverrideByHost; ## on a per-host basis
+
 ##
 ## Given two timeouts, return the one that's shorter. Note that a false
-## value is the same as an infinite timeout.
+## value is the same as an infinite timeout, so 1 is shorter than 0.
 ##
 sub ShorterTimeout($$)
 {
@@ -452,6 +448,12 @@ If you set the timeout, you probably also want to set C<NoRetry> to a
 true value.  Otherwise you'll be surprised when a server is down and
 your retry logic is running.
 
+=item QueryTimeout
+
+The amount of time (in seconds) after which query operations should give up
+and return. You may use fractional seconds. A Timeout of zero is the same
+as not having one at all.
+
 =back
 
 There are a minimum of four components to any database connection: DB,
@@ -547,7 +549,8 @@ sub Connect($@)
     my $Retry    = !delete($Options{NoRetry});
     my $Quiet    =  delete($Options{Quiet});
     my $NoAbort  =  delete($Options{NoAbort});
-    my $Timeout  =  delete($Options{Timeout});
+    my $ConnectTimeout =  delete($Options{Timeout});
+    my $QueryTimeout   =  delete($Options{QueryTimeout});
     my $Verbose  =  delete($Options{Verbose}); # undef = no change
                                                # true  = on
                                                # false = off
@@ -684,11 +687,20 @@ sub Connect($@)
 
     if ($Host and my $Override = $ConnectTimeoutOverrideByHost{$Host})
     {
-        $Timeout = ShorterTimeout($Timeout, $Override);
+        $ConnectTimeout = ShorterTimeout($ConnectTimeout, $Override);
     }
     elsif ($ConnectTimeoutOverride)
     {
-        $Timeout = ShorterTimeout($Timeout, $ConnectTimeoutOverride);
+        $ConnectTimeout = ShorterTimeout($ConnectTimeout, $ConnectTimeoutOverride);
+    }
+
+    if ($Host and my $Override = $QueryTimeoutOverrideByHost{$Host})
+    {
+        $QueryTimeout = ShorterTimeout($QueryTimeout, $Override);
+    }
+    elsif ($QueryTimeoutOverride)
+    {
+        $QueryTimeout = ShorterTimeout($QueryTimeout, $QueryTimeoutOverride);
     }
 
     my $self = {
@@ -707,7 +719,8 @@ sub Connect($@)
                 SAFE        => $SAFE,
                 DSN         => $dsn,
                 UNIQUE_KEY  => $dsn . $class,
-                TIMEOUT     => $Timeout,
+                CONNECT_TIMEOUT => $ConnectTimeout,
+                QUERY_TIMEOUT   => $QueryTimeout,
                 RetryCount  => 0,
 
                 ## Transaction info
@@ -751,13 +764,13 @@ sub Connect($@)
         ## will never have a chance to run.  That's good, but we need
         ## to make sure that users expect that.
 
-        if ($self->{TIMEOUT})
+        if ($self->{CONNECT_TIMEOUT})
         {
             eval
             {
                 local $SIG{ALRM} = sub { die "alarm\n" };
 
-                Time::HiRes::alarm($self->{TIMEOUT});
+                Time::HiRes::alarm($self->{CONNECT_TIMEOUT});
                 $dbh = DBI->connect($dsn, $User, $Password, { PrintError => 0 });
                 Time::HiRes::alarm(0);
             };
@@ -767,7 +780,7 @@ sub Connect($@)
                     $routine->($self);
                 }
 
-                my $timeout = $self->{TIMEOUT};
+                my $timeout = $self->{CONNECT_TIMEOUT};
                 undef $self; # this fires the DESTROY, which sets $@, so must
                              # do before setting $@ below.
 
@@ -849,13 +862,13 @@ sub Dump
 
 =item Timeout()
 
-Like the Timeout argument to Connect(), the amount of time (in
-seconds) after which queries should give up and return.  You may use
-fractional seconds.  A Timeout of
-zero is the same as not having one at all.
+Like the QueryTimeout argument to Connect(), sets (or resets) the amount of
+time (in seconds) after which queries should give up and return. You may
+use fractional seconds. A timeout of zero is the same as not having one at
+all.
 
 C<Timeout()> called with any (or no) arguments returns the current
-timeout value.
+query timeout value.
 
 =cut
 
@@ -866,12 +879,12 @@ sub Timeout(;$)
 
     if (defined $time)
     {
-        $self->{TIMEOUT} = $time;
+        $self->{QUERY_TIMEOUT} = $time;
     }
 
-    print "TIMEOUT SET TO: $self->{TIMEOUT}\n" if $self->{VERBOSE};
+    print "QUERY_TIMEOUT SET TO: $self->{QUERY_TIMEOUT}\n" if $self->{VERBOSE};
 
-    return $self->{TIMEOUT};
+    return $self->{QUERY_TIMEOUT};
 }
 
 =item Disconnect()
@@ -1070,13 +1083,13 @@ sub _Execute()
         ## will never have a chance to run.  That's good, but we need
         ## to make sure that users expect that.
 
-        if ($self->{TIMEOUT})
+        if ($self->{QUERY_TIMEOUT})
         {
             eval
             {
                 local $SIG{ALRM} = sub { die "alarm\n" };
 
-                Time::HiRes::alarm($self->{TIMEOUT});
+                Time::HiRes::alarm($self->{QUERY_TIMEOUT});
                 $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
                 Time::HiRes::alarm(0);
             };
@@ -1086,7 +1099,7 @@ sub _Execute()
                     $routine->($self, $statement);
                 }
 
-                $@ = "query timeout ($self->{TIMEOUT} sec passed)";
+                $@ = "query timeout ($self->{QUERY_TIMEOUT} sec passed)";
                 return ();
             }
         }
@@ -1992,7 +2005,10 @@ sub RetryWait($$)
         $0 = "(waiting on db) $0";
     }
 
-    warn "db connection down ($error), retry in 30 seconds" unless $self->{QUIET};
+    if (not $self->{QUIET}) {
+        my $now = localtime;
+        warn "$now: db connection down ($error), retry in 30 seconds";
+    }
     sleep 30;
 
     return 1;

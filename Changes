@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.41  Sep 13, 2004
+
+    - This release has seperate Tiemout and QueryTimeout args for the
+      Connect() method.
+
 0.40  Sep 08, 2004
 
     - Various "internal" releases at Yahoo added some experimental
