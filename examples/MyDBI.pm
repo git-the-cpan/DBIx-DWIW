@@ -1,5 +1,6 @@
 package MyDBI;
 use DBIx::DWIW 'safe';
+@ISA = 'DBIx::DWIW';
 use strict;
 
 =head1 NAME

@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.67 2002/03/12 00:44:03 jzawodn Exp $
+## $Id: DWIW.pm,v 1.71 2002/03/15 06:57:16 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.19';
+$VERSION = '0.20';
 $SAFE    = 1;
 
 =head1 NAME
@@ -832,9 +832,12 @@ sub _Execute()
             $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
         }
 
+        ## Otherwise, if it's an error that we know is "retryable" and
+        ## the user wants to retry (based on the RetryWait() call),
+        ## we'll try again.
+
         if (not defined $self->{ExecuteReturnCode})
         {
-            ## Check to see if the error is one we should retry for
             my $err = $self->{DBH}->errstr;
             if ($self->{RETRY}
                 and
@@ -847,10 +850,12 @@ sub _Execute()
                 and
                 $self->RetryWait($err))
             {
-                goto RETRY;
+                next;
             }
 
-            ## Really an error -- spit it out if needed.
+            ## It is really an error that we cannot (or should not)
+            ## retry, so spit it out if needed.
+
             $@ = "$err [in prepared statement]";
             Carp::cluck "execute of prepared statement returned undef [$err]" if $self->{VERBOSE};
             $self->_OperationFailed();
@@ -1412,6 +1417,7 @@ sub Scalar()
 {
     my $self = shift;
     my $sql  = shift;
+    my @bind_vals = @_;
     my $ret;
 
     $@ = "";
@@ -1424,7 +1430,7 @@ sub Scalar()
 
     print STDERR "SCALAR: $sql\n" if $self->{VERBOSE};
 
-    if ($self->Execute($sql))
+    if ($self->Execute($sql, @bind_vals))
     {
         my $sth = $self->{RecentExecutedSth};
 
@@ -1690,7 +1696,7 @@ databases.  The simplest (but least flexible) way is to create a
 package like:
 
     package MyDBI;
-    @ISA = 'DBIx::DWIWl';
+    @ISA = 'DBIx::DWIW';
     use strict;
 
     sub DefaultDB   { "MyDatabase"         }
@@ -1956,7 +1962,15 @@ contributed to its development:
 
   Jeffrey Friedl (jfriedl@yahoo.com)
   rayg (rayg@bitbaron.com)
+  John Hagelgans (jhagel@yahoo-inc.com)
   Jeremy Zawodny (Jeremy@Zawodny.com)
+
+=head1 CREDITS
+
+The following folks have provded feedback, patches, and other help
+along the way:
+
+  Eric E. Bowles (bowles@ambisys.com)
 
 Please direct comments, questions, etc to Jeremy for the time being.
 Thanks.

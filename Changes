@@ -1,5 +1,12 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.20  Fri Mar 15 10:00:00 2002
+	- various updates missing between now and 0.14
+
+	- added and documented proxy and timeout support
+
+	- fixed a few stupid bugs and doc problems
+
 0.14  Fri Dec 14 16:05:00 2001
 	- allow generic sql queries to be passed sql with placeholders and
 		bind values
