@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.120 2004/09/24 05:36:41 jfriedl Exp $
+## $Id: DWIW.pm,v 1.122 2004/10/02 00:38:37 jfriedl Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.42';
+our $VERSION = '0.44';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -819,7 +819,6 @@ sub Connect($@)
             else
             {
                 my $ERROR = ($DBI::errstr || $@ || "internal error");
-                warn "ERROR IS[$ERROR]\n";
 
                 ##
                 ## If DBI::ProxyServer is being used and the target mmysql
@@ -849,6 +848,8 @@ sub Connect($@)
         }
         else
         {
+            eval { $dbh->{AutoCommit} = 1};
+            $dbh->{mysql_auto_reconnect} = 1;
             $done = 1;  ## it worked!
         }
     } ## end while not done
@@ -1102,6 +1103,10 @@ sub _Execute()
     ##
     my $done = 0;
 
+    ## mysql_auto_reconnect (DBD::mysql >= 2.9) should always be in
+    ## lockstep with AutoCommit.
+    $self->{DBH}->{mysql_auto_reconnect} = $self->{DBH}->{AutoCommit};
+
     while (not $done)
     {
         local($SIG{PIPE}) = 'IGNORE';
@@ -1139,17 +1144,19 @@ sub _Execute()
             $self->{ExecuteReturnCode} = $sth->execute(@bind_vals);
         }
 
+        ##
         ## Otherwise, if it's an error that we know is "retryable" and
         ## the user wants to retry (based on the RetryWait() call),
         ## we'll try again.  But we will not retry if in the midst of a
         ## transaction.
-
+        ##
         if (not defined $self->{ExecuteReturnCode})
         {
             my $err = $self->{DBH}->errstr;
-            if ($self->{RETRY}
+
+            if (not $self->{TrxRunning}
                 and
-                not $self->{TrxRunning}
+                $self->{RETRY}
                 and (
                      $err =~ m/Lost connection/
                      or
@@ -1164,9 +1171,10 @@ sub _Execute()
                 }
             }
 
+            ##
             ## It is really an error that we cannot (or should not)
             ## retry, so spit it out if needed.
-
+            ##
             $@ = "$err [in prepared statement]";
             Carp::cluck "execute of prepared statement returned undef [$err]" if $self->{VERBOSE};
             $self->_OperationFailed();
@@ -2307,14 +2315,10 @@ sub Begin
         print "(auto-count)\n" if $self->{VERBOSE};
     }
 
-    ## tell DBI to disable AutoCommit and begin the transaction.  wrap it in
-    ## an eval block to try and prevent the occasional error:
-    ## 'DBD driver has not implemented the AutoCommit attribute'
-    eval { $self->{DBH}->{AutoCommit} = 0; };
-
-    my $rc = $self->{DBH}->begin_work;
     $self->{TrxRunning} = 1;
-    return $rc;
+    eval { $self->{DBH}->{AutoCommit} = 0 };
+    $self->{DBH}->{mysql_auto_reconnect} = 0;
+    return $self->{DBH}->begin_work;
 }
 
 =pod
@@ -2356,8 +2360,9 @@ sub Commit
         {
             print "Commit()ing auto-counting transaction\n" if $self->{VERBOSE};
             my $rc = $self->{DBH}->commit;
-            $self->{DBH}->{AutoCommit} = 1;
             $self->{TrxRunning} = 0;
+            eval { $self->{DBH}->{AutoCommit} = 1; };
+            $self->{DBH}->{mysql_auto_reconnect} = 1;
             $self->{BeginCount} = 0;
             $self->{TrxName}    = undef;   ## just in case
             return $rc;
@@ -2405,8 +2410,9 @@ sub Commit
             print "Commit()ing transaction - $self->{TrxName}\n"
                 if $self->{VERBOSE};
             $rc = $self->{DBH}->commit;
-            $self->{DBH}->{AutoCommit} = 1;
             $self->{TrxRunning} = 0;
+            eval { $self->{DBH}->{AutoCommit} = 1 };
+            $self->{DBH}->{mysql_auto_reconnect} = 1;
             $self->{BeginCount} = 0;      ## just in case
             $self->{TrxName}    = undef;
             return $rc;
@@ -2444,6 +2450,8 @@ sub Rollback
     ## rollback via DBI and reset things
     my $rc = $self->{DBH}->rollback;
     $self->{TrxRunning} = 0;
+    eval { $self->{DBH}->{AutoCommit} = 1 };
+    $self->{DBH}->{mysql_auto_reconnect} = 1;
     $self->{BeginCount} = 0;
     $self->{TrxName}    = undef;
     print "Rollback() transaction\n" if $self->{VERBOSE};

@@ -1,6 +1,14 @@
 Revision history for Perl extension DBIx::DWIW.
 
-0.42  Seep 24, 2004
+0.44  Oct 1, 2004
+
+    - now works with DBD::mysql v2.9000 and above
+
+0.43  Sep 26, 2004
+
+    - Oops, remove a debugging statement that had leaked into 0.42
+
+0.42  Sep 24, 2004
 
     - Handle perl failures in a connect attempt (e.g. inability
       to load an underlying module).
