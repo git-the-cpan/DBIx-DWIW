@@ -1,5 +1,31 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.35  Feb 04, 2004
+
+    - Make code match documentation for the NoRetry option.  It only
+      affectes the initial connection.
+
+    - RetryWait now retries immedately a few times, before pausing.
+      This provides faster re-connects to healty servers.
+
+    - Fixed some doc misspellings and updated contributors list.
+
+0.34  Oct 20, 2003
+
+    - MySQL 4.1 will do something substantive with prepare().  This
+      update makes use of that by automatically calling
+      prepare_cached() from any Execute, Scalar, etc, called with a
+      query string and bind-args.  This tends to catch the calls
+      inside loops, while not affecting other calls.
+
+      Prepare() can still be used to manually cache the handle.
+
+0.33  Aug 21, 2003
+
+    - To match documentation as well as common expectations, Begin()
+      returns 1 if called while already in a transaction.  Now you can
+      do Begin() or die $@.
+
 0.32  Thu Apr 17, 2003
 
     - fix bug in UNIQUE_KEY and %CurrentConnections which caused

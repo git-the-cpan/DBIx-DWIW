@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.106 2003/04/17 06:03:30 jzawodn Exp $
+## $Id: DWIW.pm,v 1.113 2004/02/02 08:01:24 jfriedl Exp $
 
 package DBIx::DWIW;
 
@@ -12,7 +12,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-$VERSION = '0.32';
+$VERSION = '0.35';
 $SAFE    = 1;
 
 =head1 NAME
@@ -56,7 +56,7 @@ This module was B<recently> extracted from Yahoo-specific code, so
 things may be a little strange yet while we smooth out any bumps and
 blemishes left over form that.
 
-DBIx::DWIW is B<intended to be sub-classed>.  Doing so will give you
+DBIx::DWIW is B<intended to be sub-classed>.  Doing so gives you
 all the benefits it can provide and the ability to easily customize
 some of its features.  You can, of course, use it directly if it meets
 your needs as-is.  But you'll be accepting its default behavior in
@@ -158,13 +158,13 @@ and:
 
 In that way, you can avoid problems that might be caused by not
 calling C<Begin()> and C<Commit()> the same number of times.  Once a
-named transaction is begun, the module will simply ignore any
+named transaction is begun, the module simply ignores any
 C<Begin()> or C<Commit()> calls that don't have a name or whose name
 doesn't match that assigned to the currently open transaction.
 
 The only exception to this rule is C<Rollback()>.  Because a
 transaction rollback usually signifies a big problem, calling
-C<Rollback()> will B<always> end the currently running transaction.
+C<Rollback()> B<always> ends the currently running transaction.
 
 Return values for these functions are a bit different, too.
 C<Begin()> and C<Commit()> can return undef, 0, or 1.  undef means
@@ -265,7 +265,7 @@ sub AUTOLOAD
 }
 
 ##
-## Allow the user to explicity tell us if they want SAFE on or off.
+## Allow the user to explicitly tell us if they want SAFE on or off.
 ##
 
 sub import
@@ -293,7 +293,7 @@ sub import
 
 The C<Connect()> constructor creates and returns a database connection
 object through which all database actions are conducted. On error, it
-will call C<die()>, so you may want to C<eval {...}> the call.  The
+calls C<die()>, so you may want to C<eval {...}> the call.  The
 C<NoAbort> option (described below) controls that behavior.
 
 C<Connect()> accepts ``hash-style'' key/value pairs as arguments.  The
@@ -352,7 +352,7 @@ encryption key (as a hex string).
 =item ProxyCipher
 
 If the proxy server requires encryption, supply the name of the
-package which provides encryption.  Typically this will be something
+package which provides encryption.  Typically this is something
 like C<Crypt::DES> or C<Crypt::Blowfish>.
 
 =item Unique
@@ -360,8 +360,8 @@ like C<Crypt::DES> or C<Crypt::Blowfish>.
 A boolean which controls connection reuse.
 
 If false (the default), multiple C<Connect>s with the same connection
-parameters (User, Pass, DB, Host) will return the same open
-connection. If C<Unique> is true, it will return a connection distinct
+parameters (User, Pass, DB, Host) return the same open
+connection. If C<Unique> is true, it returns a connection distinct
 from all other connections.
 
 If you have a process with an active connection that fork()s, be aware
@@ -389,8 +389,8 @@ Turns off warning messages.  See C<Quiet()>.
 
 =item NoRetry
 
-If true, the C<Connect()> will fail immediately if it can't connect to
-the database. Normally, it will retry based on calls to
+If true, the C<Connect()> fails immediately if it can't connect to
+the database. Normally, it retries based on calls to
 C<RetryWait()>.  C<NoRetry> affects only C<Connect>, and has no effect
 on the fault-tolerance of the package once connected.
 
@@ -398,14 +398,14 @@ on the fault-tolerance of the package once connected.
 
 If there is an error in the arguments, or in the end the database
 can't be connected to, C<Connect()> normally prints an error message
-and dies. If C<NoAbort> is true, it will put the error string into
+and dies. If C<NoAbort> is true, it puts the error string into
 C<$@> and return false.
 
 =item Timeout
 
-The amount of time (in seconds) after which C<Connect()> will give up
-and return.  You may use fractional seconds, such as 0.5, 1.0, 6.9, or
-whatever.  A Timeout of zero is the same as not having one at all.
+The amount of time (in seconds) after which C<Connect()> should give up and
+return. You may use fractional seconds. A Timeout of zero is the same as
+not having one at all.
 
 If you set the timeout, you probably also want to set C<NoRetry> to a
 true value.  Otherwise you'll be surprised when a server is down and
@@ -578,7 +578,7 @@ sub Connect($@)
         $desc = "local connection to MySQL server on $myhost";
     }
 
-    ## we're gonna build the dsn up incrementally...
+    ## we're going to build the dsn up incrementally...
     my $dsn;
 
     ## proxy details
@@ -651,7 +651,7 @@ sub Connect($@)
                 HOST        => $Host,
                 PASS        => $Password,
                 QUIET       => $Quiet,
-                RETRY       => $Retry,
+                RETRY       => 1,
                 UNIQUE      => $Unique,
                 USER        => $User,
                 PORT        => $Port,
@@ -688,7 +688,7 @@ sub Connect($@)
         ##
         ## Notice that if a timeout is hit, then the RetryWait() stuff
         ## will never have a chance to run.  That's good, but we need
-        ## to make sure that users will expect that.
+        ## to make sure that users expect that.
 
         if ($self->{TIMEOUT})
         {
@@ -778,11 +778,11 @@ sub Dump
 =item Timeout()
 
 Like the Timeout argument to Connect(), the amount of time (in
-seconds) after which queries will give up and return.  You may use
-fractional seconds, such as 0.5, 1.0, 6.9, or whatever.  A Timeout of
+seconds) after which queries should give up and return.  You may use
+fractional seconds.  A Timeout of
 zero is the same as not having one at all.
 
-C<Timeout()> called with any (or no) arguments will return the current
+C<Timeout()> called with any (or no) arguments returns the current
 timeout value.
 
 =cut
@@ -856,8 +856,9 @@ sub DESTROY($)
 
 =item Quote(@values)
 
+
 Calls the DBI C<quote()> function on each value, returning a list of
-properly quoted values. As per quote(), NULL will be returned for
+properly quoted values. As per quote(), NULL is returned for
 items that are not defined.
 
 =cut
@@ -885,6 +886,61 @@ sub Quote($@)
 
     return $ret[0];
 }
+
+=item InList($field => @values)
+
+Given a field and a value or values, returns SQL appropriate for a
+WHERE clause in the form
+
+    field = 'value'
+
+or
+
+    field IN ('value1', 'value2', ...)
+
+depending on the number of values. Each value is passed through
+C<Quote> while building the SQL.
+
+If no values are provided, nothing is returned.
+
+This function is useful because MySQL apparently does not optimize
+
+    field IN ('val')
+
+as well as it optimizes
+
+    field = 'val'
+
+=item InListUnquoted($field => @values)
+
+Just like C<InList>, but the values are not passed through C<Quote>.
+
+=cut
+
+sub InListUnquoted
+{
+    my $self   = shift;
+    my $field  = shift;
+    my @values = @_;
+
+    if (@values == 1) {
+        return "$field = $values[0]";
+    } elsif (@values > 1) {
+        return "$field IN (" . join(', ', @values) . ')';
+    } else {
+        return ();
+    }
+}
+
+sub InList
+{
+    my $self   = shift;
+    my $field  = shift;
+    my @values = $self->Quote(@_);
+
+    return $self->InListUnquoted($field => @values);
+}
+
 
 =pod
 
@@ -937,9 +993,9 @@ sub _Execute()
         ## it here.  This looks complex, but it's really a no-op
         ## unless the user wants it.
         ##
-        ## Notice that if a timeout is hit, then the RetryWait() stuff
+        ## Notice that if a timeout is hit, the RetryWait() stuff
         ## will never have a chance to run.  That's good, but we need
-        ## to make sure that users will expect that.
+        ## to make sure that users expect that.
 
         if ($self->{TIMEOUT})
         {
@@ -970,14 +1026,16 @@ sub _Execute()
         if (not defined $self->{ExecuteReturnCode})
         {
             my $err = $self->{DBH}->errstr;
-            if ($self->{RETRY} and not $self->{TrxRunning}
+            if ($self->{RETRY}
                 and
-                ($err =~ m/Lost connection/
-                 or
-                 $err =~ m/server has gone away/
-                 or
-                 $err =~ m/Server shutdown in progress/
-                )
+                not $self->{TrxRunning}
+                and (
+                     $err =~ m/Lost connection/
+                     or
+                     $err =~ m/server has gone away/
+                     or
+                     $err =~ m/Server shutdown in progress/
+                    )
                 and
                 $self->RetryWait($err))
             {
@@ -1049,7 +1107,7 @@ sub Execute($$@)
     else
     {
         print "EXECUTE> $sql\n" if $self->{VERBOSE};
-        $sth = $self->Prepare($sql);
+        $sth = $self->Prepare($sql, 0+@bind_vals);
     }
 
     return $sth->Execute(@bind_vals);
@@ -1073,12 +1131,23 @@ later execute by calling its Execute() method:
 The statement handle returned is not a native DBI statement
 handle. It's a DBIx::DWIW::Statement handle.
 
+When called from Execute(), Scalar(), Hashes(), etc. AND there
+are values to substitute, the statement handle is cached.
+This benefits a typical case where ?-substitutions being done
+lazily in an Execute call inside a loop.
+Meanwhile, interpolated sql queries, non-? queries, and
+manually Prepare'd statements are unaffected.  These typically
+do not benefit from moving caching the prepare.
+
+Note: prepare-caching is of no benefit until Mysql 4.1.
+
 =cut
 
 sub Prepare($$;$)
 {
     my $self = shift;
     my $sql  = shift;
+    my $has_bind = shift;
 
     if (not $self->{DBH})
     {
@@ -1098,10 +1167,14 @@ sub Prepare($$;$)
         print "PREPARE> $sql\n";
     }
 
-    my $dbi_sth = $self->{DBH}->prepare($sql);
+    ## Automatically cache the prepare if there are bind args.
 
-    ## Build the new statment handle object and bless it into
-    ## DBIx::DWIW::Statment.  Then return that object.
+    my $dbi_sth = $has_bind ? 
+          $self->{DBH}->prepare_cached($sql) :
+          $self->{DBH}->prepare($sql);
+
+    ## Build the new statement handle object and bless it into
+    ## DBIx::DWIW::Statement.  Then return that object.
 
     $self->{RecentPreparedSth} = $dbi_sth;
 
@@ -1235,7 +1308,7 @@ sub PreparedSql($)
 =item Hash($sql)
 
 A generic query routine. Pass an SQL statement that returns a single
-record, and it will return a hashref with all the key/value pairs of
+record, and it returns a hashref with all the key/value pairs of
 the record.
 
 The example at the bottom of page 50 of DuBois's I<MySQL> book would
@@ -1263,7 +1336,7 @@ It'll take more CPU to do this, but it is more memory efficient:
       # ... do something with $record
   }  while (defined($record = $db->Hash()));
 
-Note that a call to any other DWIW query will reset the iterator, so only
+Note that a call to any other DWIW query resets the iterator, so only
 do so when you are finished with the current query.
 
 This seems like it breaks the principle of having only one obvious way
@@ -1306,6 +1379,7 @@ sub Hash($$@)
                 $@ = "";
             }
         }
+        $sth->finish;   ## (else get error about statement handle still active)
     }
     return $result ? $result : ();
 }
@@ -1415,6 +1489,7 @@ sub Array($$@)
                 $@ = "";
             }
         }
+        $sth->finish;   ## (else get error about statement handle still active)
     }
     return @result;
 }
@@ -1580,8 +1655,8 @@ sub FlatArrayRef($$@)
 
 =item Scalar($sql)
 
-A generic query routine. Pass an SQL string, and a scalar will be
-returned to you.
+A generic query routine. Pass an SQL string, and a scalar is
+returned.
 
 If the query matches a single row column pair this is what you want.
 C<Scalar()> is useful for computational queries, count(*), max(xxx),
@@ -1621,6 +1696,7 @@ sub Scalar()
         }
         my $ref = $sth->fetchrow_arrayref;
         $ret = ${$ref}[0];
+        $sth->finish;   ## (else get error about statement handle still active)
     }
     return $ret;
 }
@@ -1629,8 +1705,8 @@ sub Scalar()
 
 =item CSV($sql)
 
-A generic query routine. Pass an SQL string, and a CSV scalar will be
-returned to you.
+A generic query routine. Pass an SQL string, and a CSV scalar is
+returned.
 
 my $max = $dbh->CSV('select * from personnel');
 
@@ -1746,7 +1822,7 @@ sub Quiet()
 
 Enable or disable "safe" mode (on by default).  In "safe" mode, you
 must prefix a native DBI method call with "dbi_" in order to call it.
-If safe mode is off, you can call native DBI mathods using their real
+If safe mode is off, you can call native DBI methods using their real
 names.
 
 For example, in safe mode, you'd write something like this:
@@ -1799,18 +1875,21 @@ This method is called each time there is a error (usually caused by a
 network outage or a server going down) which a sub-class may want to
 examine and decide how to continue.
 
-If C<RetryWait()> returns 1, the operation which was being attempted
-when the failure occured will be retried.  If it returns 0, the action
-will fail.
+If C<RetryWait()> returns 1, the operation which was being attempted when
+the failure occurred is retried. If C<RetryWait()> returns 0, the action
+fails.
 
-The default implementation causes your application to emit a message
-to STDERR (via a C<warn()> call) and then sleep for 30 seconds before
-retrying.  You probably want to override this so that it will
-eventually give up.  Otherwise your application may hang forever.  It
-does maintain a count of how many times the retry has been attempted
-in C<$self->{RetryCount}>.
+The default implementation causes your application to make up to three
+immediate reconnect attempts, and if all fail, emit a message to STDERR
+(via a C<warn()> call) and then sleep for 30 seconds. After 30 seconds, the
+warning and sleep repeat until successful.
 
-Note that RetryWait() will not be called in the middle of transaction.
+You probably want to override this so method that it will eventually give
+up. Otherwise your application may hang forever. The default method does
+maintain a count of how many times the retry has been attempted in
+C<$self->{RetryCount}>.
+
+Note that RetryWait() is not be called in the middle of transaction.
 In that case, we assume that the transaction will have been rolled
 back by the server and you'll get an error.
 
@@ -1821,7 +1900,14 @@ sub RetryWait($$)
     my $self  = shift;
     my $error = shift;
 
-    if (not $self->{RetryStart})
+    ##
+    ## Immediately retry a few times, to pick up timed-out connections
+    ##
+    if ($self->{RetryCount}++ <= 2)
+    {
+        return 1;
+    }
+    elsif (not $self->{RetryStart})
     {
         $self->{RetryStart} = time;
         $self->{RetryCommand} = $0;
@@ -1829,10 +1915,8 @@ sub RetryWait($$)
     }
 
     warn "db connection down ($error), retry in 30 seconds" unless $self->{QUIET};
-
-    $self->{RetryCount}++;
-
     sleep 30;
+
     return 1;
 }
 
@@ -1846,7 +1930,7 @@ sub _OperationSuccessful($)
 {
     my $self = shift;
 
-    if (not $self->{QUIET} and $self->{RetryCount} and $self->{RetryCount} > 1)
+    if (not $self->{QUIET} and $self->{RetryCount} > 1)
     {
         my $now   = localtime;
         my $since = localtime($self->{RetryStart});
@@ -2081,7 +2165,7 @@ sub Begin
             print "$self->{TrxName}\n" if $self->{VERBOSE};
         }
 
-        return 0;
+        return 1;
     }
 
     print "Begin() starting new transaction - " if $self->{VERBOSE};
@@ -2351,12 +2435,12 @@ contributed to its development:
 
   Jeffrey Friedl (jfriedl@yahoo.com)
   rayg (rayg@bitbaron.com)
-  John Hagelgans (jhagel@yahoo-inc.com)
+  John Hagelgans
   Jeremy Zawodny (Jeremy@Zawodny.com)
 
 =head1 CREDITS
 
-The following folks have provded feedback, patches, and other help
+The following folks have provided feedback, patches, and other help
 along the way:
 
   Eric E. Bowles (bowles@ambisys.com)
