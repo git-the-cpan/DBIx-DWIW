@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.126 2005/10/10 18:06:46 ksv Exp $
+## $Id: DWIW.pm,v 1.127 2007/01/03 22:08:10 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -810,7 +810,7 @@ sub Connect($@)
                 and
                 ($DBI::errstr =~ m/can\'t connect/i
                  or
-                 $DBI::errstr =~ m/Too many connections/i)
+                 $DBI::errstr =~ m/Too many connections/i
                  or
                  $DBI::errstr =~ m/Lost connection to MySQL server/i)
                 and
