@@ -1,5 +1,11 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.46  Jan 3, 2006
+
+    - catch additional error message for potential retry
+
+    - misc other cleanups merged in
+
 0.44  Oct 1, 2004
 
     - now works with DBD::mysql v2.9000 and above

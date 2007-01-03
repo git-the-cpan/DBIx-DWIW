@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.122 2004/10/02 00:38:37 jfriedl Exp $
+## $Id: DWIW.pm,v 1.126 2005/10/10 18:06:46 ksv Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.44';
+our $VERSION = '0.46';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -811,6 +811,8 @@ sub Connect($@)
                 ($DBI::errstr =~ m/can\'t connect/i
                  or
                  $DBI::errstr =~ m/Too many connections/i)
+                 or
+                 $DBI::errstr =~ m/Lost connection to MySQL server/i)
                 and
                 $self->RetryWait($DBI::errstr))
             {
@@ -2030,6 +2032,11 @@ sub RetryWait($$)
     my $self  = shift;
     my $error = shift;
 
+    if ($self->{RetryCount} > 9) # we failed too many times, die already. 
+    {
+        return 0;
+    }
+
     ##
     ## Immediately retry a few times, to pick up timed-out connections
     ##
@@ -2581,6 +2588,7 @@ along the way:
   DH <crazyinsomniac@yahoo.com>
   Toby Elliott (telliott@yahoo-inc.com)
   Keith C. Ivey (keith@smokefreedc.org)
+  Brian Webb (brianw@yahoo-inc.com)
 
 Please direct comments, questions, etc to Jeremy for the time being.
 Thanks.
