@@ -1,6 +1,6 @@
 ## $Source: /CVSROOT/yahoo/finance/lib/perl/PackageMasters/DBIx-DWIW/DWIW.pm,v $
 ##
-## $Id: DWIW.pm,v 1.127 2007/01/03 22:08:10 jzawodn Exp $
+## $Id: DWIW.pm,v 1.128 2007/02/17 04:47:30 jzawodn Exp $
 
 package DBIx::DWIW;
 
@@ -11,7 +11,7 @@ use Carp;
 use Sys::Hostname;  ## for reporting errors
 use Time::HiRes;    ## for fast timeouts
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our $SAFE    = 1;
 
 =head1 NAME
@@ -1566,6 +1566,7 @@ sub Hashes($$@)
             push @records, $ref;
         }
     }
+    $self->{RecentExecutedSth}->finish;
     return @records;
 }
 

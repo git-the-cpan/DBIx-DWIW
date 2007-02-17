@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DWIW.
 
+0.48  Jan 3, 2006
+
+    - fix missing $sth->finish reported by Jeffrey Friedl
+
 0.47  Jan 3, 2006
 
     - fix syntax error that snuck out in last release!
